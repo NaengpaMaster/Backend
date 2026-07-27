@@ -48,6 +48,9 @@ dependencies {
     implementation 'org.flywaydb:flyway-core'
     implementation 'org.flywaydb:flyway-database-postgresql'
 
+    // Swagger/OpenAPI
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.3'
+
     // Actuator: 서버 상태 확인용
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
 
