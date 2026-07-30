@@ -157,6 +157,12 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.fail(exception.getMessage()));
     }
 
+    @ExceptionHandler(DuplicateShoppingItemException.class)
+    public ResponseEntity<ApiResponse<Void>> handleDuplicateShoppingItemException(DuplicateShoppingItemException exception) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiResponse.fail(exception.getMessage()));
+    }
+
     @ExceptionHandler(InquiryNotFoundException.class)
     public ResponseEntity<ApiResponse<Void>> handleInquiryNotFoundException(InquiryNotFoundException exception) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
