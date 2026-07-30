@@ -5,7 +5,7 @@ import com.naengpa.naengpamasterbackend.global.exception.DuplicateShoppingItemEx
 import com.naengpa.naengpamasterbackend.member.entity.HouseholdType;
 import com.naengpa.naengpamasterbackend.member.entity.Member;
 import com.naengpa.naengpamasterbackend.member.repository.MemberRepository;
-import com.naengpa.naengpamasterbackend.product.repository.ProductRepository
+import com.naengpa.naengpamasterbackend.product.repository.ProductRepository;
 import com.naengpa.naengpamasterbackend.shopping.dto.request.ShoppingItemCheckRequest;
 import com.naengpa.naengpamasterbackend.shopping.dto.request.ShoppingItemCreateRequest;
 import com.naengpa.naengpamasterbackend.shopping.dto.request.ShoppingItemMoveToFridgeRequest;
