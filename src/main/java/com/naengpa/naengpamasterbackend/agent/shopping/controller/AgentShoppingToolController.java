@@ -3,16 +3,18 @@ package com.naengpa.naengpamasterbackend.agent.shopping.controller;
 import com.naengpa.naengpamasterbackend.fridge.dto.response.FridgeItemListResponse;
 import com.naengpa.naengpamasterbackend.fridge.service.FridgeItemService;
 import com.naengpa.naengpamasterbackend.global.response.ApiResponse;
+import com.naengpa.naengpamasterbackend.shopping.dto.request.ShoppingItemCreateRequest;
 import com.naengpa.naengpamasterbackend.shopping.dto.response.ShoppingItemListResponse;
+import com.naengpa.naengpamasterbackend.shopping.dto.response.ShoppingItemResponse;
 import com.naengpa.naengpamasterbackend.shopping.service.ShoppingItemService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -28,7 +30,6 @@ public class AgentShoppingToolController {
         this.fridgeItemService = fridgeItemService;
         this.shoppingItemService = shoppingItemService;
     }
-
 
 
     // AI 냉장고 재료 조회 Tool
@@ -57,5 +58,26 @@ public class AgentShoppingToolController {
         return ResponseEntity.ok(
                 ApiResponse.success(shoppingItemService.findShoppingItems(authentication.getName()))
         );
+    }
+
+    // AI 장보기 추천 생성
+
+    // 승인 추천 항목 장보기 추가
+    @Operation(
+            summary = "AI 승인 장보기 항목 추가",
+            description = "AI 추천 결과 중 사용자가 승인한 항목을 장보기 목록에 추가합니다."
+    )
+    @PostMapping("/shopping-items")
+    public ResponseEntity<ApiResponse<ShoppingItemResponse>> createShoppingItemByAgent(
+            @Parameter(hidden = true) Authentication authentication,
+            @Valid @RequestBody ShoppingItemCreateRequest request
+    ) {
+        ShoppingItemResponse response = shoppingItemService.createShoppingItem(
+                authentication.getName(),
+                request
+        );
+
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success("AI 추천 장보기 항목이 등록되었습니다.", response));
     }
 }
