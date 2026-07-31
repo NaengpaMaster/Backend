@@ -177,7 +177,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(InquiryAlreadyAnsweredException.class)
     public ResponseEntity<ApiResponse<Void>> handleInquiryAlreadyAnsweredException(InquiryAlreadyAnsweredException exception) {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+        return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(ApiResponse.fail(exception.getMessage()));
     }
 
