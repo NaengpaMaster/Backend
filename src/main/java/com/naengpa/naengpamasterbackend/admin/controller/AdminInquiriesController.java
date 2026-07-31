@@ -9,7 +9,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort.Direction;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -27,9 +27,12 @@ public class AdminInquiriesController {
     @GetMapping
     public ResponseEntity<ApiResponse<Page<AdminInquiryResponse>>> getInquiries(
             @RequestParam Boolean isAnswered,
-            @PageableDefault(sort = "createdAt", direction = Direction.DESC) Pageable pageable
+            @RequestParam(required = false) Sort.Direction sortDirection,
+            @PageableDefault(size = 10) Pageable pageable
     ) {
-        return ResponseEntity.ok(ApiResponse.success(adminInquiryService.getInquiries(isAnswered, pageable)));
+        return ResponseEntity.ok(
+                ApiResponse.success(
+                        adminInquiryService.getInquiries(isAnswered, sortDirection, pageable)));
     }
 
     // 문의 상세 조회 API
