@@ -18,7 +18,9 @@ import lombok.RequiredArgsConstructor;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -34,36 +36,35 @@ public class AdminInquiryService {
     private final NotificationService notificationService;
 
     @Transactional(readOnly = true)
-    public Page<AdminInquiryResponse> getInquiries(Boolean isAnswered, Pageable pageable) {
-        if (isAnswered) {
-            return adminInquiryRepository
-                    .findByIsAnsweredAndIsDeletedFalseOrderByAnsweredAtDesc(isAnswered, pageable)
-                    .map(inquiry -> {
-                        Member member = memberRepository.findById(inquiry.getMemberId()).orElse(null);
-                        String nickname = member != null ? member.getNickname() : null;
-                        return AdminInquiryResponse.from(inquiry, nickname);
-                    });
-        }
+    public Page<AdminInquiryResponse> getInquiries(Boolean isAnswered, Sort.Direction sortDirection, Pageable pageable) {
+        boolean answered = Boolean.TRUE.equals(isAnswered);
 
-        return adminInquiryRepository.findByIsAnsweredAndIsDeletedFalseOrderByCreatedAtAsc(isAnswered, pageable)
-                .map(inquiry -> {
-                    Member member = memberRepository.findById(inquiry.getMemberId()).orElse(null);
-                    String nickname = member != null ? member.getNickname() : null;
-                    return AdminInquiryResponse.from(inquiry, nickname);
-                });
+        Sort.Direction direction = sortDirection != null
+                ? sortDirection
+                : answered
+                  ? Sort.Direction.DESC
+                  : Sort.Direction.ASC;
+
+        String sortProperty = answered
+                ? "answeredAt"
+                : "createdAt";
+
+        Pageable queryPageable = PageRequest.of(
+                pageable.getPageNumber(),
+                pageable.getPageSize(),
+                Sort.by(direction, sortProperty)
+        );
+
+        return adminInquiryRepository.findInquiryList(
+                isAnswered,
+                queryPageable
+        );
     }
 
     @Transactional(readOnly = true)
     public AdminInquiryDetailResponse getInquiryDetail(Long inquiryId) {
-        Inquiry inquiry = adminInquiryRepository.findByIdAndIsDeletedFalse(inquiryId)
+        return adminInquiryRepository.findInquiryDetail(inquiryId)
                 .orElseThrow(InquiryNotFoundException::new);
-
-        InquiryAnswer inquiryAnswer = adminInquiryAnswerRepository
-                .findByInquiryIdAndIsDeletedFalse(inquiryId).orElse(null);
-
-        Member member = memberRepository.findById(inquiry.getMemberId()).orElse(null);
-        String nickname = member != null ? member.getNickname() : null;
-        return AdminInquiryDetailResponse.from(inquiry, inquiryAnswer, nickname);
     }
 
     /**
