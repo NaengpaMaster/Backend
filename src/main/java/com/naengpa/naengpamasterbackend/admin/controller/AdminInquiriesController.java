@@ -51,8 +51,8 @@ public class AdminInquiriesController {
             @AuthenticationPrincipal UserDetails userDetails
             ) {
 
-        String email = userDetails.getUsername();
-        adminInquiryService.createInquiryAnswer(inquiryId, request, email);
+        String adminEmail = userDetails.getUsername();
+        adminInquiryService.createInquiryAnswer(inquiryId, request, adminEmail);
 
         return ResponseEntity.ok(ApiResponse.success(null));
     }

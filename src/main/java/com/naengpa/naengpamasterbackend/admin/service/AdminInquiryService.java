@@ -71,7 +71,7 @@ public class AdminInquiryService {
      * 관리자 문의 답변을 등록하며, 사전 검사와 DB UNIQUE 제약으로 중복 답변을 방지한다.
      */
     @Transactional
-    public void createInquiryAnswer(Long inquiryId, AdminAnswerRequest request, String email) {
+    public void createInquiryAnswer(Long inquiryId, AdminAnswerRequest request, String adminEmail) {
         Inquiry inquiry = adminInquiryRepository.findByIdAndIsDeletedFalse(inquiryId)
                 .orElseThrow(InquiryNotFoundException::new);
 
@@ -83,7 +83,7 @@ public class AdminInquiryService {
             throw new InquiryAlreadyAnsweredException();
         }
 
-        Long adminId = resolveAdminIdOrThrow(email);
+        Long adminId = resolveAdminIdOrThrow(adminEmail);
 
         InquiryAnswer inquiryAnswer = InquiryAnswer.create(inquiryId, request.content(), adminId);
 
@@ -102,7 +102,7 @@ public class AdminInquiryService {
     }
 
     @Transactional
-    public void updateInquiryAnswer(Long inquiryId, Long answerId, AdminAnswerRequest request, String email) {
+    public void updateInquiryAnswer(Long inquiryId, Long answerId, AdminAnswerRequest request, String adminEmail) {
         adminInquiryRepository.findByIdAndIsDeletedFalse(inquiryId)
                 .orElseThrow(InquiryNotFoundException::new);
 
@@ -110,7 +110,7 @@ public class AdminInquiryService {
                 .findByIdAndInquiryIdAndIsDeletedFalse(answerId, inquiryId)
                 .orElseThrow(InquiryAnswerNotFoundException::new);
 
-        Long adminId = resolveAdminIdOrThrow(email);
+        Long adminId = resolveAdminIdOrThrow(adminEmail);
 
         inquiryAnswer.update(request.content(), adminId);
     }

@@ -12,6 +12,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -38,9 +40,11 @@ public class AdminMemberController {
     @PatchMapping("/{memberId}/status")
     public ResponseEntity<ApiResponse<Void>> updateMemberStatus(
             @PathVariable Long memberId,
-            @RequestBody @Valid AdminMemberStatusRequest request) {
+            @RequestBody @Valid AdminMemberStatusRequest request,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        String adminEmail = userDetails.getUsername();
 
-        adminMemberService.updateMemberStatus(memberId, request);
+        adminMemberService.updateMemberStatus(memberId, request, adminEmail);
         return ResponseEntity.ok(ApiResponse.success(null));
     }
 
@@ -48,8 +52,11 @@ public class AdminMemberController {
     @PatchMapping("/{memberId}/role")
     public ResponseEntity<ApiResponse<Void>> updateMemberRole(
             @PathVariable Long memberId,
-            @RequestBody @Valid AdminMemberRoleRequest request) {
-        adminMemberService.updateMemberRole(memberId, request);
+            @RequestBody @Valid AdminMemberRoleRequest request,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        String adminEmail = userDetails.getUsername();
+
+        adminMemberService.updateMemberRole(memberId, request, adminEmail);
         return ResponseEntity.ok(ApiResponse.success(null));
     }
 
