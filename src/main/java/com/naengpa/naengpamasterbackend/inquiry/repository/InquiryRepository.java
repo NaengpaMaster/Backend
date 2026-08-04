@@ -14,4 +14,9 @@ public interface InquiryRepository extends JpaRepository<Inquiry, Long> {
     Page<Inquiry> findByMemberIdAndIsDeletedFalseOrderByCreatedAtDesc(Long memberId, Pageable pageable);
 
     Optional<Inquiry> findByIdAndIsDeletedFalse(Long inquiryId);
+
+    Optional<Inquiry> findByIdAndMemberIdAndIsDeletedFalse(
+            Long inquiryId,
+            Long memberId
+    );
 }

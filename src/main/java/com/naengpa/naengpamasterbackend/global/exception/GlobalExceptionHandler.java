@@ -177,7 +177,26 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(InquiryAlreadyAnsweredException.class)
     public ResponseEntity<ApiResponse<Void>> handleInquiryAlreadyAnsweredException(InquiryAlreadyAnsweredException exception) {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiResponse.fail(exception.getMessage()));
+    }
+
+    @ExceptionHandler({
+            MemberStatusAlreadyAppliedException.class,
+            MemberRoleAlreadyAppliedException.class
+    })
+    public ResponseEntity<ApiResponse<Void>> handleMemberChangeAlreadyAppliedException(RuntimeException exception) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiResponse.fail(exception.getMessage()));
+    }
+
+    @ExceptionHandler({
+            InvalidMemberStatusChangeException.class,
+            InvalidMemberRoleChangeException.class,
+            LastAdminDemotionException.class
+    })
+    public ResponseEntity<ApiResponse<Void>> handleInvalidMemberChangeException(RuntimeException exception) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(ApiResponse.fail(exception.getMessage()));
     }
 
