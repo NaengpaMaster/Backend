@@ -15,7 +15,6 @@ import com.naengpa.naengpamasterbackend.member.repository.MemberRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,14 +39,14 @@ public class InquiryService {
     // 상세 조회
     @Transactional(readOnly = true)
     public InquiryDetailResponse getInquiryDetail(Long inquiryId, String email) {
+        Long memberId = resolveMemberId(email);
 
-        Inquiry inquiry = inquiryRepository.findByIdAndIsDeletedFalse(inquiryId)
+        Inquiry inquiry = inquiryRepository
+                .findByIdAndMemberIdAndIsDeletedFalse(inquiryId, memberId)
                 .orElseThrow(InquiryNotFoundException::new);
 
-        Long memberId = resolveMemberId(email);
-        validateUser(memberId, inquiry);
-
-        InquiryAnswer inquiryAnswer = inquiryAnswerRepository.findByInquiryIdAndIsDeletedFalse(inquiryId)
+        InquiryAnswer inquiryAnswer = inquiryAnswerRepository
+                .findByInquiryIdAndIsDeletedFalse(inquiryId)
                 .orElse(null);
         return InquiryDetailResponse.from(inquiry ,inquiryAnswer);
     }
@@ -64,10 +63,10 @@ public class InquiryService {
     @Transactional
     public void updateInquiry(Long inquiryId, InquiryRequest request, String email) {
         Long memberId = resolveMemberId(email);
-        Inquiry inquiry = inquiryRepository.findByIdAndIsDeletedFalse(inquiryId)
+        Inquiry inquiry = inquiryRepository
+                .findByIdAndMemberIdAndIsDeletedFalse(inquiryId, memberId)
                 .orElseThrow(InquiryNotFoundException::new);
 
-        validateUser(memberId, inquiry);
         validateNotAnswered(inquiry);
 
         inquiry.update(request);
@@ -77,10 +76,10 @@ public class InquiryService {
     @Transactional
     public void deleteInquiry(Long inquiryId, String email) {
         Long memberId = resolveMemberId(email);
-        Inquiry inquiry = inquiryRepository.findByIdAndIsDeletedFalse(inquiryId)
+        Inquiry inquiry = inquiryRepository
+                .findByIdAndMemberIdAndIsDeletedFalse(inquiryId, memberId)
                 .orElseThrow(InquiryNotFoundException::new);
 
-        validateUser(memberId, inquiry);
         validateNotAnswered(inquiry);
 
         inquiry.delete();
@@ -91,13 +90,6 @@ public class InquiryService {
             throw new InquiryAlreadyAnsweredException();
         }
     }
-
-    private void validateUser(Long memberId, Inquiry inquiry) {
-        if (!inquiry.getMemberId().equals(memberId)) {
-            throw new AccessDeniedException("접근 권한이 없습니다.");
-        }
-    }
-
     private Long resolveMemberId(String email) {
         return memberRepository.findByEmail(email)
                 .map(Member::getId)

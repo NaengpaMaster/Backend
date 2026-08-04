@@ -10,6 +10,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Optional;
+
 @Repository
 public interface AdminMemberRepository extends JpaRepository<Member, Long> {
 
@@ -57,4 +59,8 @@ public interface AdminMemberRepository extends JpaRepository<Member, Long> {
 
     @Query("SELECT COUNT(m) FROM Member m WHERE m.role = :role AND (m.status = :status OR m.deletedAt IS NOT NULL)")
     Long countInactiveByRole(@Param("role") MemberRole role, @Param("status") MemberStatus status);
+
+    Optional<Member> findByEmail(String adminEmail);
+
+    int countByRoleAndStatus(MemberRole memberRole, MemberStatus memberStatus);
 }
