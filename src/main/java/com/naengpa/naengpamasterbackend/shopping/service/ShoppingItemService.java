@@ -3,6 +3,7 @@ package com.naengpa.naengpamasterbackend.shopping.service;
 import com.naengpa.naengpamasterbackend.fridge.entity.FridgeItem;
 import com.naengpa.naengpamasterbackend.fridge.dto.response.FridgeItemResponse;
 import com.naengpa.naengpamasterbackend.fridge.repository.FridgeItemRepository;
+import com.naengpa.naengpamasterbackend.global.exception.DuplicateShoppingItemException;
 import com.naengpa.naengpamasterbackend.global.exception.ShoppingItemNotFoundException;
 import com.naengpa.naengpamasterbackend.member.entity.Member;
 import com.naengpa.naengpamasterbackend.member.repository.MemberRepository;
@@ -66,6 +67,14 @@ public class ShoppingItemService {
 
         //존재하는 사전 재료인지
         productService.validateExists(request.productId());
+
+        //중복 체크
+        if (shoppingItemRepository.existsByMemberIdAndProductIdAndIsDeletedFalseAndIsPurchasedFalse(
+                member.getId(),
+                request.productId()
+        )) {
+            throw new DuplicateShoppingItemException();
+        }
 
         ShoppingItem shoppingItem = ShoppingItem.create(
                 member.getId(),
