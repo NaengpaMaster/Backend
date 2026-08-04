@@ -60,8 +60,6 @@ public class AgentShoppingToolController {
         );
     }
 
-    // AI 장보기 추천 생성
-
     // 승인 추천 항목 장보기 추가
     @Operation(
             summary = "AI 승인 장보기 항목 추가",
