@@ -1,5 +1,6 @@
 package com.naengpa.naengpamasterbackend.agent.shopping.service;
 
+import com.naengpa.naengpamasterbackend.agent.conversation.service.ConversationCommandService;
 import com.naengpa.naengpamasterbackend.agent.shopping.dto.request.ShoppingRecommendationRequest;
 import com.naengpa.naengpamasterbackend.agent.shopping.dto.response.ShoppingRecommendationItemResponse;
 import com.naengpa.naengpamasterbackend.agent.shopping.dto.response.ShoppingRecommendationResponse;
@@ -25,12 +26,20 @@ public class AgentShoppingRecommendationService {
     private final ShoppingItemRepository shoppingItemRepository;
     private final MemberRepository memberRepository;
     private final ProductRepository productRepository;
+    private final ConversationCommandService conversationCommandService;
 
-    public AgentShoppingRecommendationService(FridgeItemRepository fridgeItemRepository, ShoppingItemRepository shoppingItemRepository, MemberRepository memberRepository, ProductRepository productRepository) {
+    public AgentShoppingRecommendationService(
+            FridgeItemRepository fridgeItemRepository,
+            ShoppingItemRepository shoppingItemRepository,
+            MemberRepository memberRepository,
+            ProductRepository productRepository,
+            ConversationCommandService conversationCommandService
+    ) {
         this.fridgeItemRepository = fridgeItemRepository;
         this.shoppingItemRepository = shoppingItemRepository;
         this.memberRepository = memberRepository;
         this.productRepository = productRepository;
+        this.conversationCommandService = conversationCommandService;
     }
 
 
@@ -46,7 +55,7 @@ public class AgentShoppingRecommendationService {
         List<ShoppingItem> shoppingItems =
                 shoppingItemRepository.findByMemberIdAndIsDeletedFalse(member.getId());
 
-        // 이미 냉장고에 있거나 장보기 예정인 재료는 제외하고, 남은 사전 재료를 추천한다
+        // 이미 냉장고에 있거나 장보기 예정인 재료는 제외하고, 남은 사전 재료를 추천
         Set<Long> excludedProductIds = new HashSet<>();
 
         fridgeItems.stream()
@@ -81,6 +90,9 @@ public class AgentShoppingRecommendationService {
                                 "냉장고와 장보기 목록에 없는 재료입니다."
                         ))
                         .toList();
+
+        // 추천 결과를 바로 장보기 DB에 넣지는 않고, 사용자가 나중에 볼 수 있도록 AI 대화 기록만 저장
+        conversationCommandService.saveShoppingRecommendationHistory(member.getId(), items);
 
         return new ShoppingRecommendationResponse(items);
     }
