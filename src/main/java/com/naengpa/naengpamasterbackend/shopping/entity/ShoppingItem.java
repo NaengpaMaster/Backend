@@ -22,6 +22,9 @@ public class ShoppingItem {
     @Column(name = "member_id", nullable = false)
     Long memberId;
 
+    @Column(name = "fridge_id", nullable = false)
+    Long fridgeId;
+
     @Column(name = "product_id", nullable = false)
     Long productId;
 
@@ -46,11 +49,13 @@ public class ShoppingItem {
     //생성
     public static ShoppingItem create(
         Long memberId,
+        Long fridgeId,
         Long productId,
         String quantity
     ) {
         ShoppingItem shoppingItem = new ShoppingItem();
         shoppingItem.memberId = memberId;
+        shoppingItem.fridgeId = fridgeId;
         shoppingItem.productId = productId;
         shoppingItem.quantity = quantity;
         shoppingItem.isPurchased = false;

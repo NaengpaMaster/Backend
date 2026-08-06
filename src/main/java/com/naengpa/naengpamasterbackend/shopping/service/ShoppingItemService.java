@@ -3,6 +3,7 @@ package com.naengpa.naengpamasterbackend.shopping.service;
 import com.naengpa.naengpamasterbackend.fridge.entity.FridgeItem;
 import com.naengpa.naengpamasterbackend.fridge.dto.response.FridgeItemResponse;
 import com.naengpa.naengpamasterbackend.fridge.repository.FridgeItemRepository;
+import com.naengpa.naengpamasterbackend.fridge.service.FridgeService;
 import com.naengpa.naengpamasterbackend.global.exception.DuplicateShoppingItemException;
 import com.naengpa.naengpamasterbackend.global.exception.ShoppingItemNotFoundException;
 import com.naengpa.naengpamasterbackend.member.entity.Member;
@@ -35,19 +36,22 @@ public class ShoppingItemService {
     private final ProductService productService;
     private final ProductRepository productRepository;
     private final FridgeItemRepository fridgeItemRepository;
+    private final FridgeService fridgeService;
 
     public ShoppingItemService(
             ShoppingItemRepository shoppingItemRepository,
             MemberRepository memberRepository,
             ProductService productService,
             ProductRepository productRepository,
-            FridgeItemRepository fridgeItemRepository
+            FridgeItemRepository fridgeItemRepository,
+            FridgeService fridgeService
             ) {
         this.shoppingItemRepository = shoppingItemRepository;
         this.memberRepository = memberRepository;
         this.productService = productService;
         this.productRepository = productRepository;
         this.fridgeItemRepository = fridgeItemRepository;
+        this.fridgeService = fridgeService;
     }
 
     //회원 인증 공통 로직
@@ -76,8 +80,11 @@ public class ShoppingItemService {
             throw new DuplicateShoppingItemException();
         }
 
+        Long fridgeId = fridgeService.findOrCreateFridgeId(member);
+
         ShoppingItem shoppingItem = ShoppingItem.create(
                 member.getId(),
+                fridgeId,
                 request.productId(),
                 request.quantity()
         );
@@ -181,18 +188,23 @@ public class ShoppingItemService {
                 .findById(shoppingItem.getProductId())
                 .orElseThrow(() -> new ProductNotFoundException(shoppingItem.getProductId()));
 
-        LocalDate expiryDate= request.expiryDate();
+        // 프론트에서 별도 유통기한을 보내지 않으면 사전 재료의 기본 유통기한을 사용
+        LocalDate expiryDate = request == null ? null : request.expiryDate();
+        String memo = request == null ? null : request.memo();
 
-        if(expiryDate == null && product.getDefaultExpiryDays() != null) {
+        if (expiryDate == null && product.getDefaultExpiryDays() != null) {
             expiryDate = LocalDate.now().plusDays(product.getDefaultExpiryDays());
         }
 
+        Long fridgeId = fridgeService.findOrCreateFridgeId(member);
+
         FridgeItem fridgeItem = FridgeItem.create(
+                fridgeId,
                 member.getId(),
                 shoppingItem.getProductId(),
                 shoppingItem.getQuantity(),
                 expiryDate,
-                request.memo()
+                memo
         );
 
         FridgeItem savedFridgeItem = fridgeItemRepository.save(fridgeItem);

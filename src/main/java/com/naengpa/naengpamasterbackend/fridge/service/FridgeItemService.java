@@ -28,6 +28,7 @@ public class FridgeItemService {
     private final MemberRepository memberRepository;
     private final ProductService productService;
     private final ProductRepository productRepository;
+    private final FridgeService fridgeService;
 
     private Member findMemberByEmail(String email) {
         return memberRepository.findByEmail(email)
@@ -43,11 +44,13 @@ public class FridgeItemService {
             FridgeItemRepository fridgeItemRepository,
             MemberRepository memberRepository,
             ProductService productService,
-            ProductRepository productRepository) {
+            ProductRepository productRepository,
+            FridgeService fridgeService) {
         this.fridgeItemRepository = fridgeItemRepository;
         this.memberRepository = memberRepository;
         this.productService = productService;
         this.productRepository = productRepository;
+        this.fridgeService = fridgeService;
     }
 
     // 냉장고 재료 등록
@@ -57,8 +60,10 @@ public class FridgeItemService {
         Member member = findMemberByEmail(email);
         //존재하는 사전 재료인지
         productService.validateExists(request.productId());
+        Long fridgeId = fridgeService.findOrCreateFridgeId(member);
 
         FridgeItem fridgeItem = FridgeItem.create(
+                fridgeId,
                 member.getId(),
                 request.productId(),
                 request.quantity(),

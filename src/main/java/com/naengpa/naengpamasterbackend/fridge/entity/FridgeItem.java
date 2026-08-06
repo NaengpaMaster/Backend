@@ -17,6 +17,9 @@ public class FridgeItem {
     @Column(name = "fridge_item_id")
     private Long fridgeItemId;
 
+    @Column(name = "fridge_id", nullable = false)
+    private Long fridgeId;
+
     @Column(name = "member_id", nullable = false)
     private Long memberId;
     @Column(name = "product_id", nullable = false)
@@ -38,6 +41,7 @@ public class FridgeItem {
 
     //생성
     public static FridgeItem create(
+            Long fridgeId,
             Long memberId,
             Long productId,
             String quantity,
@@ -45,6 +49,7 @@ public class FridgeItem {
             String memo
     ) {
         FridgeItem fridgeItem = new FridgeItem();
+        fridgeItem.fridgeId = fridgeId;
         fridgeItem.memberId = memberId;
         fridgeItem.productId = productId;
         fridgeItem.quantity = quantity;

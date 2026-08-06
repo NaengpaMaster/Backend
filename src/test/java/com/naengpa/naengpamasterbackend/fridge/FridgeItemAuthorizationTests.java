@@ -4,6 +4,7 @@ import com.naengpa.naengpamasterbackend.fridge.dto.request.FridgeItemUpdateReque
 import com.naengpa.naengpamasterbackend.fridge.entity.FridgeItem;
 import com.naengpa.naengpamasterbackend.fridge.repository.FridgeItemRepository;
 import com.naengpa.naengpamasterbackend.fridge.service.FridgeItemService;
+import com.naengpa.naengpamasterbackend.fridge.service.FridgeService;
 import com.naengpa.naengpamasterbackend.member.entity.Member;
 import com.naengpa.naengpamasterbackend.member.repository.MemberRepository;
 import com.naengpa.naengpamasterbackend.product.service.ProductService;
@@ -29,7 +30,8 @@ class FridgeItemAuthorizationTests {
             fridgeItemRepository,
             memberRepository,
             productService,
-            mock(com.naengpa.naengpamasterbackend.product.repository.ProductRepository.class)
+            mock(com.naengpa.naengpamasterbackend.product.repository.ProductRepository.class),
+            mock(FridgeService.class)
     );
 
     @Test
@@ -73,6 +75,7 @@ class FridgeItemAuthorizationTests {
         Member member = Member.createUser("owner@example.com", "encoded", "owner", null);
         ReflectionTestUtils.setField(member, "id", 1L);
         FridgeItem fridgeItem = FridgeItem.create(
+                1L,
                 1L,
                 1L,
                 "1개",
