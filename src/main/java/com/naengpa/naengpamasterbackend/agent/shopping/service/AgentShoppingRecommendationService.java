@@ -12,6 +12,8 @@ import com.naengpa.naengpamasterbackend.agent.usage.service.LlmUsageLogService;
 import com.naengpa.naengpamasterbackend.fridge.entity.FridgeItem;
 import com.naengpa.naengpamasterbackend.fridge.repository.FridgeItemRepository;
 import com.naengpa.naengpamasterbackend.member.entity.Member;
+import com.naengpa.naengpamasterbackend.member.repository.MemberExcludedProductRepository;
+import com.naengpa.naengpamasterbackend.member.repository.MemberFavoriteFoodRepository;
 import com.naengpa.naengpamasterbackend.member.repository.MemberRepository;
 import com.naengpa.naengpamasterbackend.product.entity.Product;
 import com.naengpa.naengpamasterbackend.product.repository.ProductRepository;
@@ -33,6 +35,8 @@ public class AgentShoppingRecommendationService {
     private final ShoppingItemRepository shoppingItemRepository;
     private final MemberRepository memberRepository;
     private final ProductRepository productRepository;
+    private final MemberExcludedProductRepository memberExcludedProductRepository;
+    private final MemberFavoriteFoodRepository memberFavoriteFoodRepository;
     private final ConversationCommandService conversationCommandService;
     private final LlmUsageLogService llmUsageLogService;
     private final AgentShoppingRecommendationClient agentShoppingRecommendationClient;
@@ -43,6 +47,8 @@ public class AgentShoppingRecommendationService {
             ShoppingItemRepository shoppingItemRepository,
             MemberRepository memberRepository,
             ProductRepository productRepository,
+            MemberExcludedProductRepository memberExcludedProductRepository,
+            MemberFavoriteFoodRepository memberFavoriteFoodRepository,
             ConversationCommandService conversationCommandService,
             LlmUsageLogService llmUsageLogService,
             AgentShoppingRecommendationClient agentShoppingRecommendationClient,
@@ -52,6 +58,8 @@ public class AgentShoppingRecommendationService {
         this.shoppingItemRepository = shoppingItemRepository;
         this.memberRepository = memberRepository;
         this.productRepository = productRepository;
+        this.memberExcludedProductRepository = memberExcludedProductRepository;
+        this.memberFavoriteFoodRepository = memberFavoriteFoodRepository;
         this.conversationCommandService = conversationCommandService;
         this.llmUsageLogService = llmUsageLogService;
         this.agentShoppingRecommendationClient = agentShoppingRecommendationClient;
@@ -72,7 +80,7 @@ public class AgentShoppingRecommendationService {
             List<ShoppingItem> shoppingItems =
                     shoppingItemRepository.findByMemberIdAndIsDeletedFalse(member.getId());
 
-            // 이미 냉장고에 있거나 장보기 예정인 재료는 추천 후보에서 제외
+            // 이미 냉장고에 있거나 장보기 예정인 재료, 회원이 못 먹는 재료는 추천 후보에서 제외
             Set<Long> excludedProductIds = new HashSet<>();
 
             fridgeItems.stream()
@@ -84,18 +92,28 @@ public class AgentShoppingRecommendationService {
                     .map(ShoppingItem::getProductId)
                     .forEach(excludedProductIds::add);
 
+            // 못 먹는 재료는 백엔드에서 먼저 제거해 Agent가 실수로 추천하지 못하게 함
+            memberExcludedProductRepository.findAllByMemberWithProduct(member).stream()
+                    .map(memberExcludedProduct -> memberExcludedProduct.getProduct().getProductId())
+                    .forEach(excludedProductIds::add);
+
+            // 선호 음식은 Product 카테고리와 직접 매핑하지 않고, Agent의 추천 판단 기준으로 전달
+            List<String> favoriteFoods = memberFavoriteFoodRepository.findAllByMemberOrderByIdAsc(member).stream()
+                    .map(memberFavoriteFood -> memberFavoriteFood.getFoodCategory().getName())
+                    .toList();
+
             int limit = normalizeLimit(request.limit());
 
             List<Product> activeProducts = productRepository.findByIsActiveTrue();
 
             List<Product> candidateProducts = activeProducts.stream()
                     .filter(product -> !excludedProductIds.contains(product.getProductId()))
-                    .limit(Math.max(limit * 5L, 20L))
+                    .limit(Math.max(limit * 10L, 50L))
                     .toList();
 
             List<ShoppingRecommendationItemResponse> items = agentEnabled
-                    ? recommendWithAgent(member.getId(), fridgeItems, shoppingItems, candidateProducts, limit)
-                    : recommendWithRuleBased(candidateProducts, limit);
+                    ? recommendWithAgent(member.getId(), fridgeItems, shoppingItems, candidateProducts, favoriteFoods, limit)
+                    : recommendWithRuleBased(candidateProducts, favoriteFoods, limit);
 
             // 추천 결과를 바로 장보기 DB에 넣지는 않고, 사용자가 나중에 볼 수 있도록 AI 대화 기록만 저장
             conversationCommandService.saveShoppingRecommendationHistory(member.getId(), items);
@@ -135,12 +153,14 @@ public class AgentShoppingRecommendationService {
             List<FridgeItem> fridgeItems,
             List<ShoppingItem> shoppingItems,
             List<Product> candidateProducts,
+            List<String> favoriteFoods,
             int limit
     ) {
         try {
             AgentShoppingRecommendationResponse response = agentShoppingRecommendationClient.recommend(
                     new AgentShoppingRecommendationRequest(
                             limit,
+                            favoriteFoods,
                             toProductPayloads(fridgeItems.stream()
                                     .map(FridgeItem::getProductId)
                                     .toList()),
@@ -182,9 +202,12 @@ public class AgentShoppingRecommendationService {
 
     private List<ShoppingRecommendationItemResponse> recommendWithRuleBased(
             List<Product> candidateProducts,
+            List<String> favoriteFoods,
             int limit
     ) {
         // Agent 연동을 끈 테스트/개발 환경에서는 기존 rule-based 추천으로 동작
+        String reason = buildRuleBasedReason(favoriteFoods);
+
         return candidateProducts.stream()
                 .limit(limit)
                 .map(product -> new ShoppingRecommendationItemResponse(
@@ -192,9 +215,18 @@ public class AgentShoppingRecommendationService {
                         product.getProductCategoryId(),
                         product.getName(),
                         "1개",
-                        "냉장고와 장보기 목록에 없는 재료입니다."
+                        reason
                 ))
                 .toList();
+    }
+
+    private String buildRuleBasedReason(List<String> favoriteFoods) {
+        if (favoriteFoods.isEmpty()) {
+            return "냉장고와 장보기 목록에 없고 못 먹는 재료가 아닌 재료입니다.";
+        }
+
+        return "선호 음식(" + String.join(", ", favoriteFoods)
+                + ")과 못 먹는 재료 정보를 기준으로 추천되었습니다.";
     }
 
     private List<AgentProductPayload> toProductPayloads(List<Long> productIds) {

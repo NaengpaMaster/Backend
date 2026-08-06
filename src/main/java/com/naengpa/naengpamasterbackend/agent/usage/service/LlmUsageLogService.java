@@ -10,12 +10,17 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 
 @Service
 public class LlmUsageLogService {
 
     public static final String RULE_BASED_MVP_MODEL = "rule-based-mvp";
+    public static final String GPT_4_1_MINI_MODEL = "gpt-4.1-mini";
+    private static final BigDecimal GPT_4_1_MINI_INPUT_PRICE_PER_1M = BigDecimal.valueOf(0.40);
+    private static final BigDecimal GPT_4_1_MINI_OUTPUT_PRICE_PER_1M = BigDecimal.valueOf(1.60);
+    private static final BigDecimal TOKENS_PER_MILLION = BigDecimal.valueOf(1_000_000);
 
     private final LlmUsageLogRepository llmUsageLogRepository;
     private final MemberRepository memberRepository;
@@ -63,14 +68,16 @@ public class LlmUsageLogService {
             Integer totalTokens,
             BigDecimal estimatedCost
     ) {
-        // FastAPI Agent가 반환한 실제 LLM 사용량을 그대로 저장
+        BigDecimal cost = resolveEstimatedCost(modelName, promptTokens, completionTokens, estimatedCost);
+
+        // FastAPI Agent가 반환한 실제 LLM 사용량을 저장하고, 비용이 없으면 백엔드 단가 기준으로 계산
         llmUsageLogRepository.save(LlmUsageLog.success(
                 memberId,
                 modelName,
                 promptTokens,
                 completionTokens,
                 totalTokens,
-                estimatedCost
+                cost
         ));
     }
 
@@ -100,6 +107,38 @@ public class LlmUsageLogService {
         }
 
         return failureMessage.substring(0, FAILURE_MESSAGE_MAX_LENGTH);
+    }
+
+    private BigDecimal resolveEstimatedCost(
+            String modelName,
+            Integer promptTokens,
+            Integer completionTokens,
+            BigDecimal estimatedCost
+    ) {
+        if (estimatedCost != null && estimatedCost.compareTo(BigDecimal.ZERO) > 0) {
+            return estimatedCost;
+        }
+
+        if (GPT_4_1_MINI_MODEL.equals(modelName)) {
+            return calculateGpt41MiniEstimatedCost(promptTokens, completionTokens);
+        }
+
+        return estimatedCost == null ? BigDecimal.ZERO : estimatedCost;
+    }
+
+    private BigDecimal calculateGpt41MiniEstimatedCost(
+            Integer promptTokens,
+            Integer completionTokens
+    ) {
+        BigDecimal inputCost = BigDecimal.valueOf(promptTokens == null ? 0 : promptTokens)
+                .multiply(GPT_4_1_MINI_INPUT_PRICE_PER_1M)
+                .divide(TOKENS_PER_MILLION, 8, RoundingMode.HALF_UP);
+
+        BigDecimal outputCost = BigDecimal.valueOf(completionTokens == null ? 0 : completionTokens)
+                .multiply(GPT_4_1_MINI_OUTPUT_PRICE_PER_1M)
+                .divide(TOKENS_PER_MILLION, 8, RoundingMode.HALF_UP);
+
+        return inputCost.add(outputCost);
     }
 
     private Member findMemberByEmail(String email) {

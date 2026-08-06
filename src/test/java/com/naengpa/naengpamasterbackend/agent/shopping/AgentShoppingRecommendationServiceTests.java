@@ -1,6 +1,7 @@
 package com.naengpa.naengpamasterbackend.agent.shopping;
 
 import com.naengpa.naengpamasterbackend.agent.shopping.dto.request.ShoppingRecommendationRequest;
+import com.naengpa.naengpamasterbackend.agent.shopping.dto.response.ShoppingRecommendationItemResponse;
 import com.naengpa.naengpamasterbackend.agent.shopping.dto.response.ShoppingRecommendationResponse;
 import com.naengpa.naengpamasterbackend.agent.shopping.service.AgentShoppingRecommendationService;
 import com.naengpa.naengpamasterbackend.agent.conversation.entity.ConversationMessageRole;
@@ -8,8 +9,11 @@ import com.naengpa.naengpamasterbackend.agent.conversation.repository.Conversati
 import com.naengpa.naengpamasterbackend.agent.conversation.repository.ConversationSessionRepository;
 import com.naengpa.naengpamasterbackend.agent.usage.entity.LlmCallStatus;
 import com.naengpa.naengpamasterbackend.agent.usage.repository.LlmUsageLogRepository;
+import com.naengpa.naengpamasterbackend.fridge.service.FridgeService;
 import com.naengpa.naengpamasterbackend.member.entity.HouseholdType;
 import com.naengpa.naengpamasterbackend.member.entity.Member;
+import com.naengpa.naengpamasterbackend.member.entity.MemberExcludedProduct;
+import com.naengpa.naengpamasterbackend.member.repository.MemberExcludedProductRepository;
 import com.naengpa.naengpamasterbackend.member.repository.MemberRepository;
 import com.naengpa.naengpamasterbackend.product.entity.Product;
 import com.naengpa.naengpamasterbackend.product.repository.ProductRepository;
@@ -50,6 +54,12 @@ class AgentShoppingRecommendationServiceTests {
     @Autowired
     private LlmUsageLogRepository llmUsageLogRepository;
 
+    @Autowired
+    private MemberExcludedProductRepository memberExcludedProductRepository;
+
+    @Autowired
+    private FridgeService fridgeService;
+
     @Test
     @DisplayName("AI 장보기 추천 시 미구매 장보기 항목은 제외")
     void recommend_excludesUnpurchasedShoppingItems() {
@@ -67,8 +77,11 @@ class AgentShoppingRecommendationServiceTests {
                 7
         ));
 
+        Long fridgeId = fridgeService.findOrCreateFridgeId(member);
+
         shoppingItemRepository.save(ShoppingItem.create(
                 member.getId(),
+                fridgeId,
                 shoppingProduct.getProductId(),
                 "1개"
         ));
@@ -86,6 +99,39 @@ class AgentShoppingRecommendationServiceTests {
 
         assertThat(result.items()).hasSizeLessThanOrEqualTo(20);
     }
+
+    @Test
+    @DisplayName("AI 장보기 추천 시 회원이 못 먹는 재료는 제외")
+    void recommend_excludesMemberAvoidProducts() {
+        // given
+        Member member = memberRepository.save(Member.createUser(
+                "agent-avoid@test.com",
+                "password",
+                "추천제외못먹는재료유저",
+                HouseholdType.ONE_PERSON
+        ));
+
+        Product avoidProduct = productRepository.save(Product.create(
+                1L,
+                "추천제외못먹는재료",
+                7
+        ));
+
+        // 회원 프로필에 등록된 못 먹는 재료는 추천 후보에서 백엔드가 먼저 제거해야 함
+        memberExcludedProductRepository.save(MemberExcludedProduct.create(member, avoidProduct));
+
+        ShoppingRecommendationRequest request = new ShoppingRecommendationRequest(20);
+
+        // when
+        ShoppingRecommendationResponse result =
+                agentShoppingRecommendationService.recommend(member.getEmail(), request);
+
+        // then
+        assertThat(result.items())
+                .extracting(ShoppingRecommendationItemResponse::productId)
+                .doesNotContain(avoidProduct.getProductId());
+    }
+
 
     @Test
     @DisplayName("AI 장보기 추천 결과는 요청 limit 개수 이하로 반환")

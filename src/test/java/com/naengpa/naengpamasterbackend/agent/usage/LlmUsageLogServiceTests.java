@@ -80,6 +80,34 @@ class LlmUsageLogServiceTests {
     }
 
     @Test
+    @DisplayName("gpt-4.1-mini 성공 로그 저장 시 토큰 수 기준으로 예상 비용을 계산한다")
+    void saveSuccessLog_calculatesGpt41MiniEstimatedCost() {
+        // given
+        Member member = memberRepository.save(Member.createUser(
+                "llm-cost@test.com",
+                "password",
+                "사용량비용테스트유저",
+                HouseholdType.ONE_PERSON
+        ));
+
+        // when
+        llmUsageLogService.saveSuccessLog(
+                member.getId(),
+                LlmUsageLogService.GPT_4_1_MINI_MODEL,
+                2_000,
+                500,
+                2_500,
+                BigDecimal.ZERO
+        );
+
+        // then
+        var logs = llmUsageLogRepository.findByMemberIdOrderByCreatedAtDesc(member.getId());
+
+        assertThat(logs).hasSize(1);
+        assertThat(logs.get(0).getEstimatedCost()).isEqualByComparingTo("0.00160000");
+    }
+
+    @Test
     @DisplayName("로그인한 회원의 LLM 사용량 로그만 조회한다")
     void findMyUsageLogs_returnsOnlyMyLogs() {
         // given

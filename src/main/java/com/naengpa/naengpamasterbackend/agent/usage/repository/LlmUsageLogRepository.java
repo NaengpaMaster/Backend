@@ -8,4 +8,6 @@ import java.util.List;
 public interface LlmUsageLogRepository extends JpaRepository<LlmUsageLog, Long> {
 
     List<LlmUsageLog> findByMemberIdOrderByCreatedAtDesc(Long memberId);
+
+    List<LlmUsageLog> findAllByOrderByCreatedAtDesc();
 }

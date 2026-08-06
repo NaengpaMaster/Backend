@@ -119,7 +119,7 @@ public class ShoppingItemController {
             Authentication authentication,
             @Parameter(description = "장보기 항목 ID", example = "1", required = true)
             @PathVariable Long shoppingItemId,
-            @Valid @RequestBody ShoppingItemMoveToFridgeRequest request
+            @Valid @RequestBody(required = false) ShoppingItemMoveToFridgeRequest request
     ) {
         FridgeItemResponse response = shoppingItemService.moveShoppingItemToFridge(
                 authentication.getName(),
