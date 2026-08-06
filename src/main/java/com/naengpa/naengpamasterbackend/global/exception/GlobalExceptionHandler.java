@@ -181,6 +181,12 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.fail(exception.getMessage()));
     }
 
+    @ExceptionHandler(AiConversationSessionNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleAiConversationSessionNotFoundException(AiConversationSessionNotFoundException exception) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.fail(exception.getMessage()));
+    }
+
     @ExceptionHandler(InquiryAlreadyAnsweredException.class)
     public ResponseEntity<ApiResponse<Void>> handleInquiryAlreadyAnsweredException(InquiryAlreadyAnsweredException exception) {
         return ResponseEntity.status(HttpStatus.CONFLICT)

@@ -3,8 +3,11 @@ package com.naengpa.naengpamasterbackend.agent.shopping;
 import com.naengpa.naengpamasterbackend.agent.shopping.dto.request.ShoppingRecommendationRequest;
 import com.naengpa.naengpamasterbackend.agent.shopping.dto.response.ShoppingRecommendationResponse;
 import com.naengpa.naengpamasterbackend.agent.shopping.service.AgentShoppingRecommendationService;
-import com.naengpa.naengpamasterbackend.fridge.entity.FridgeItem;
-import com.naengpa.naengpamasterbackend.fridge.repository.FridgeItemRepository;
+import com.naengpa.naengpamasterbackend.agent.conversation.entity.ConversationMessageRole;
+import com.naengpa.naengpamasterbackend.agent.conversation.repository.ConversationMessageRepository;
+import com.naengpa.naengpamasterbackend.agent.conversation.repository.ConversationSessionRepository;
+import com.naengpa.naengpamasterbackend.agent.usage.entity.LlmCallStatus;
+import com.naengpa.naengpamasterbackend.agent.usage.repository.LlmUsageLogRepository;
 import com.naengpa.naengpamasterbackend.member.entity.HouseholdType;
 import com.naengpa.naengpamasterbackend.member.entity.Member;
 import com.naengpa.naengpamasterbackend.member.repository.MemberRepository;
@@ -18,8 +21,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
@@ -38,14 +39,20 @@ class AgentShoppingRecommendationServiceTests {
     private ProductRepository productRepository;
 
     @Autowired
-    private FridgeItemRepository fridgeItemRepository;
-
-    @Autowired
     private ShoppingItemRepository shoppingItemRepository;
 
+    @Autowired
+    private ConversationSessionRepository conversationSessionRepository;
+
+    @Autowired
+    private ConversationMessageRepository conversationMessageRepository;
+
+    @Autowired
+    private LlmUsageLogRepository llmUsageLogRepository;
+
     @Test
-    @DisplayName("AI 장보기 추천 시 냉장고 보유 재료와 미구매 장보기 항목은 제외")
-    void recommend_excludesFridgeItemsAndUnpurchasedShoppingItems() {
+    @DisplayName("AI 장보기 추천 시 미구매 장보기 항목은 제외")
+    void recommend_excludesUnpurchasedShoppingItems() {
         // given
         Member member = memberRepository.save(Member.createUser(
                 "agent-recommend@test.com",
@@ -54,25 +61,10 @@ class AgentShoppingRecommendationServiceTests {
                 HouseholdType.ONE_PERSON
         ));
 
-        Product fridgeProduct = productRepository.save(Product.create(
-                1L,
-                "추천제외냉장고재료",
-                7
-        ));
-
         Product shoppingProduct = productRepository.save(Product.create(
                 1L,
                 "추천제외장보기재료",
                 7
-        ));
-
-
-        fridgeItemRepository.save(FridgeItem.create(
-                member.getId(),
-                fridgeProduct.getProductId(),
-                "1개",
-                LocalDate.now().plusDays(7),
-                null
         ));
 
         shoppingItemRepository.save(ShoppingItem.create(
@@ -90,7 +82,7 @@ class AgentShoppingRecommendationServiceTests {
         // then
         assertThat(result.items())
                 .extracting(item -> item.productId())
-                .doesNotContain(fridgeProduct.getProductId(), shoppingProduct.getProductId());
+                .doesNotContain(shoppingProduct.getProductId());
 
         assertThat(result.items()).hasSizeLessThanOrEqualTo(20);
     }
@@ -147,5 +139,64 @@ class AgentShoppingRecommendationServiceTests {
         // when & then
         assertThatThrownBy(() -> agentShoppingRecommendationService.recommend(email, request))
                 .isInstanceOf(BadCredentialsException.class);
+    }
+
+    @Test
+    @DisplayName("AI 장보기 추천 요청 시 대화 세션과 USER/ASSISTANT 메시지가 저장된다")
+    void recommend_savesConversationSessionAndMessages() {
+        // given
+        Member member = memberRepository.save(Member.createUser(
+                "agent-history@test.com",
+                "password",
+                "추천기록테스트유저",
+                HouseholdType.ONE_PERSON
+        ));
+
+        ShoppingRecommendationRequest request = new ShoppingRecommendationRequest(3);
+
+        // when
+        agentShoppingRecommendationService.recommend(member.getEmail(), request);
+
+        // then
+        var sessions = conversationSessionRepository
+                .findByMemberIdAndIsDeletedFalseOrderByCreatedAtDesc(member.getId());
+
+        assertThat(sessions).hasSize(1);
+        assertThat(sessions.get(0).getTitle()).isEqualTo("AI 장보기 추천");
+
+        var messages = conversationMessageRepository
+                .findByConversationSessionIdOrderByCreatedAtAsc(
+                        sessions.get(0).getConversationSessionId()
+                );
+
+        assertThat(messages).hasSize(2);
+        assertThat(messages)
+                .extracting(message -> message.getRole())
+                .containsExactly(ConversationMessageRole.USER, ConversationMessageRole.ASSISTANT);
+    }
+
+    @Test
+    @DisplayName("AI 장보기 추천 요청 성공 시 LLM 사용량 성공 로그가 저장된다")
+    void recommend_savesLlmSuccessUsageLog() {
+        // given
+        Member member = memberRepository.save(Member.createUser(
+                "agent-usage@test.com",
+                "password",
+                "추천사용량테스트유저",
+                HouseholdType.ONE_PERSON
+        ));
+
+        ShoppingRecommendationRequest request = new ShoppingRecommendationRequest(3);
+
+        // when
+        agentShoppingRecommendationService.recommend(member.getEmail(), request);
+
+        // then
+        var logs = llmUsageLogRepository.findByMemberIdOrderByCreatedAtDesc(member.getId());
+
+        assertThat(logs).hasSize(1);
+        assertThat(logs.get(0).getModelName()).isEqualTo("rule-based-mvp");
+        assertThat(logs.get(0).getStatus()).isEqualTo(LlmCallStatus.SUCCESS);
+        assertThat(logs.get(0).getTotalTokens()).isZero();
     }
 }
