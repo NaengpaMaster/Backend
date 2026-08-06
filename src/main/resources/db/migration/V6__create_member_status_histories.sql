@@ -1,7 +1,7 @@
 -- =========================================
 -- 회원 상태 변경 이력
 -- =========================================
-CREATE TABLE member_status_histories (
+CREATE TABLE IF NOT EXISTS member_status_histories (
                                          member_status_history_id BIGSERIAL PRIMARY KEY,
 
                                          member_id BIGINT NOT NULL,
@@ -17,8 +17,8 @@ CREATE TABLE member_status_histories (
 
 COMMENT ON TABLE member_status_histories IS '회원 상태 변경 이력';
 
-CREATE INDEX idx_member_status_histories_member_created
+CREATE INDEX IF NOT EXISTS idx_member_status_histories_member_created
     ON member_status_histories(member_id, created_at DESC);
 
-CREATE INDEX idx_member_status_histories_status_created
+CREATE INDEX IF NOT EXISTS idx_member_status_histories_status_created
     ON member_status_histories(changed_status, created_at DESC);
