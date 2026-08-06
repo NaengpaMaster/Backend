@@ -1,10 +1,16 @@
 package com.naengpa.naengpamasterbackend.admin.service;
 
+import com.naengpa.naengpamasterbackend.admin.dto.request.AdminMemberRoleRequest;
 import com.naengpa.naengpamasterbackend.admin.dto.request.AdminMemberStatusRequest;
 import com.naengpa.naengpamasterbackend.admin.repository.AdminMemberRepository;
 import com.naengpa.naengpamasterbackend.global.auth.repository.RefreshTokenRepository;
-import com.naengpa.naengpamasterbackend.member.entity.HouseholdType;
+import com.naengpa.naengpamasterbackend.global.exception.InvalidMemberRoleChangeException;
+import com.naengpa.naengpamasterbackend.global.exception.InvalidMemberStatusChangeException;
+import com.naengpa.naengpamasterbackend.global.exception.LastAdminDemotionException;
+import com.naengpa.naengpamasterbackend.global.exception.MemberRoleAlreadyAppliedException;
+import com.naengpa.naengpamasterbackend.global.exception.MemberStatusAlreadyAppliedException;
 import com.naengpa.naengpamasterbackend.member.entity.Member;
+import com.naengpa.naengpamasterbackend.member.entity.MemberRole;
 import com.naengpa.naengpamasterbackend.member.entity.MemberStatus;
 import com.naengpa.naengpamasterbackend.member.entity.MemberStatusHistory;
 import com.naengpa.naengpamasterbackend.member.repository.MemberStatusHistoryRepository;
@@ -12,9 +18,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -40,77 +50,153 @@ class AdminMemberServiceTest {
     }
 
     @Test
-    void updateMemberStatusSavesHistory() {
-        Member member = Member.createUser(
-                "member@example.com",
-                "encoded-password",
-                "회원",
-                HouseholdType.ETC
-        );
+    void updateMemberStatusDeactivatesAnotherMemberAndSavesHistory() {
+        Member member = member(1L, MemberRole.USER, MemberStatus.ACTIVE);
+        Member admin = member(2L, MemberRole.ADMIN, MemberStatus.ACTIVE);
         given(adminMemberRepository.findById(1L)).willReturn(Optional.of(member));
+        given(adminMemberRepository.findByEmail("admin@example.com")).willReturn(Optional.of(admin));
         given(refreshTokenRepository.findAllByMemberAndExpiredAtAfter(
-                org.mockito.ArgumentMatchers.eq(member),
-                org.mockito.ArgumentMatchers.any()
-        )).willReturn(java.util.List.of());
+                any(Member.class), any(LocalDateTime.class)
+        )).willReturn(List.of());
 
         adminMemberService.updateMemberStatus(
-                1L,
-                new AdminMemberStatusRequest(MemberStatus.INACTIVE)
+                1L, new AdminMemberStatusRequest(MemberStatus.INACTIVE), "admin@example.com"
         );
 
-        ArgumentCaptor<MemberStatusHistory> historyCaptor =
-                ArgumentCaptor.forClass(MemberStatusHistory.class);
-        verify(memberStatusHistoryRepository).save(historyCaptor.capture());
-        assertThat(member.getStatus()).isEqualTo(MemberStatus.INACTIVE);
-        assertThat(historyCaptor.getValue().getMemberId()).isEqualTo(1L);
-        assertThat(historyCaptor.getValue().getPreviousStatus()).isEqualTo(MemberStatus.ACTIVE);
-        assertThat(historyCaptor.getValue().getChangedStatus()).isEqualTo(MemberStatus.INACTIVE);
+        ArgumentCaptor<MemberStatusHistory> captor = ArgumentCaptor.forClass(MemberStatusHistory.class);
+        verify(member).updateStatus(MemberStatus.INACTIVE);
+        verify(memberStatusHistoryRepository).save(captor.capture());
+        assertThat(captor.getValue().getMemberId()).isEqualTo(1L);
+        assertThat(captor.getValue().getPreviousStatus()).isEqualTo(MemberStatus.ACTIVE);
+        assertThat(captor.getValue().getChangedStatus()).isEqualTo(MemberStatus.INACTIVE);
+        verify(refreshTokenRepository).findAllByMemberAndExpiredAtAfter(
+                any(Member.class), any(LocalDateTime.class)
+        );
     }
 
     @Test
-    void updateMemberStatusDoesNotSaveHistoryWhenStatusIsUnchanged() {
-        Member member = Member.createUser(
-                "member@example.com",
-                "encoded-password",
-                "회원",
-                HouseholdType.ETC
-        );
+    void updateMemberStatusActivatesMemberAndSavesHistoryWithoutLookingUpRefreshTokens() {
+        Member member = member(1L, MemberRole.USER, MemberStatus.INACTIVE);
+        Member admin = member(2L, MemberRole.ADMIN, MemberStatus.ACTIVE);
         given(adminMemberRepository.findById(1L)).willReturn(Optional.of(member));
+        given(adminMemberRepository.findByEmail("admin@example.com")).willReturn(Optional.of(admin));
 
         adminMemberService.updateMemberStatus(
-                1L,
-                new AdminMemberStatusRequest(MemberStatus.ACTIVE)
+                1L, new AdminMemberStatusRequest(MemberStatus.ACTIVE), "admin@example.com"
         );
 
-        verify(memberStatusHistoryRepository, never()).save(org.mockito.ArgumentMatchers.any());
-        verify(refreshTokenRepository, never())
-                .findAllByMemberAndExpiredAtAfter(
-                        org.mockito.ArgumentMatchers.any(),
-                        org.mockito.ArgumentMatchers.any()
-                );
+        verify(member).updateStatus(MemberStatus.ACTIVE);
+        verify(memberStatusHistoryRepository).save(any(MemberStatusHistory.class));
+        verify(refreshTokenRepository, never()).findAllByMemberAndExpiredAtAfter(any(), any());
     }
 
     @Test
-    void updateMemberStatusSavesReactivationHistory() {
-        Member member = Member.createUser(
-                "member@example.com",
-                "encoded-password",
-                "회원",
-                HouseholdType.ETC
-        );
-        member.updateStatus(MemberStatus.INACTIVE);
+    void updateMemberStatusRejectsAlreadyAppliedStatus() {
+        Member member = member(1L, MemberRole.USER, MemberStatus.ACTIVE);
+        Member admin = member(2L, MemberRole.ADMIN, MemberStatus.ACTIVE);
         given(adminMemberRepository.findById(1L)).willReturn(Optional.of(member));
+        given(adminMemberRepository.findByEmail("admin@example.com")).willReturn(Optional.of(admin));
 
-        adminMemberService.updateMemberStatus(
-                1L,
-                new AdminMemberStatusRequest(MemberStatus.ACTIVE)
+        assertThatThrownBy(() -> adminMemberService.updateMemberStatus(
+                1L, new AdminMemberStatusRequest(MemberStatus.ACTIVE), "admin@example.com"
+        )).isInstanceOf(MemberStatusAlreadyAppliedException.class);
+
+        verify(member, never()).updateStatus(any());
+        verify(memberStatusHistoryRepository, never()).save(any());
+    }
+
+    @Test
+    void updateMemberStatusRejectsSelfDeactivation() {
+        Member admin = member(1L, MemberRole.ADMIN, MemberStatus.ACTIVE);
+        given(adminMemberRepository.findById(1L)).willReturn(Optional.of(admin));
+        given(adminMemberRepository.findByEmail("admin@example.com")).willReturn(Optional.of(admin));
+
+        assertThatThrownBy(() -> adminMemberService.updateMemberStatus(
+                1L, new AdminMemberStatusRequest(MemberStatus.INACTIVE), "admin@example.com"
+        )).isInstanceOf(InvalidMemberStatusChangeException.class);
+
+        verify(admin, never()).updateStatus(any());
+        verify(memberStatusHistoryRepository, never()).save(any());
+    }
+
+    @Test
+    void updateMemberRolePromotesUserToAdmin() {
+        Member member = member(1L, MemberRole.USER, MemberStatus.ACTIVE);
+        Member admin = member(2L, MemberRole.ADMIN, MemberStatus.ACTIVE);
+        given(adminMemberRepository.findById(1L)).willReturn(Optional.of(member));
+        given(adminMemberRepository.findByEmail("admin@example.com")).willReturn(Optional.of(admin));
+
+        adminMemberService.updateMemberRole(
+                1L, new AdminMemberRoleRequest(MemberRole.ADMIN), "admin@example.com"
         );
 
-        ArgumentCaptor<MemberStatusHistory> historyCaptor =
-                ArgumentCaptor.forClass(MemberStatusHistory.class);
-        verify(memberStatusHistoryRepository).save(historyCaptor.capture());
-        assertThat(member.getStatus()).isEqualTo(MemberStatus.ACTIVE);
-        assertThat(historyCaptor.getValue().getPreviousStatus()).isEqualTo(MemberStatus.INACTIVE);
-        assertThat(historyCaptor.getValue().getChangedStatus()).isEqualTo(MemberStatus.ACTIVE);
+        verify(member).updateRole(MemberRole.ADMIN);
+        verify(adminMemberRepository, never()).countByRoleAndStatus(any(), any());
+    }
+
+    @Test
+    void updateMemberRoleRejectsAlreadyAppliedRole() {
+        Member member = member(1L, MemberRole.USER, MemberStatus.ACTIVE);
+        Member admin = member(2L, MemberRole.ADMIN, MemberStatus.ACTIVE);
+        given(adminMemberRepository.findById(1L)).willReturn(Optional.of(member));
+        given(adminMemberRepository.findByEmail("admin@example.com")).willReturn(Optional.of(admin));
+
+        assertThatThrownBy(() -> adminMemberService.updateMemberRole(
+                1L, new AdminMemberRoleRequest(MemberRole.USER), "admin@example.com"
+        )).isInstanceOf(MemberRoleAlreadyAppliedException.class);
+
+        verify(member, never()).updateRole(any());
+    }
+
+    @Test
+    void updateMemberRoleRejectsSelfDemotion() {
+        Member admin = member(1L, MemberRole.ADMIN, MemberStatus.ACTIVE);
+        given(adminMemberRepository.findById(1L)).willReturn(Optional.of(admin));
+        given(adminMemberRepository.findByEmail("admin@example.com")).willReturn(Optional.of(admin));
+
+        assertThatThrownBy(() -> adminMemberService.updateMemberRole(
+                1L, new AdminMemberRoleRequest(MemberRole.USER), "admin@example.com"
+        )).isInstanceOf(InvalidMemberRoleChangeException.class);
+
+        verify(admin, never()).updateRole(any());
+    }
+
+    @Test
+    void updateMemberRoleRejectsLastActiveAdminDemotion() {
+        Member member = member(1L, MemberRole.ADMIN, MemberStatus.ACTIVE);
+        Member admin = member(2L, MemberRole.ADMIN, MemberStatus.ACTIVE);
+        given(adminMemberRepository.findById(1L)).willReturn(Optional.of(member));
+        given(adminMemberRepository.findByEmail("admin@example.com")).willReturn(Optional.of(admin));
+        given(adminMemberRepository.countByRoleAndStatus(MemberRole.ADMIN, MemberStatus.ACTIVE))
+                .willReturn(1);
+
+        assertThatThrownBy(() -> adminMemberService.updateMemberRole(
+                1L, new AdminMemberRoleRequest(MemberRole.USER), "admin@example.com"
+        )).isInstanceOf(LastAdminDemotionException.class);
+
+        verify(member, never()).updateRole(any());
+    }
+
+    @Test
+    void updateMemberRoleAllowsInactiveAdminDemotion() {
+        Member member = member(1L, MemberRole.ADMIN, MemberStatus.INACTIVE);
+        Member admin = member(2L, MemberRole.ADMIN, MemberStatus.ACTIVE);
+        given(adminMemberRepository.findById(1L)).willReturn(Optional.of(member));
+        given(adminMemberRepository.findByEmail("admin@example.com")).willReturn(Optional.of(admin));
+
+        adminMemberService.updateMemberRole(
+                1L, new AdminMemberRoleRequest(MemberRole.USER), "admin@example.com"
+        );
+
+        verify(member).updateRole(MemberRole.USER);
+        verify(adminMemberRepository, never()).countByRoleAndStatus(any(), any());
+    }
+
+    private Member member(Long id, MemberRole role, MemberStatus status) {
+        Member member = mock(Member.class);
+        given(member.getId()).willReturn(id);
+        given(member.getRole()).willReturn(role);
+        given(member.getStatus()).willReturn(status);
+        return member;
     }
 }

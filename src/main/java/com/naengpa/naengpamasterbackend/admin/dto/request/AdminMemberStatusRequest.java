@@ -4,6 +4,6 @@ import com.naengpa.naengpamasterbackend.member.entity.MemberStatus;
 import jakarta.validation.constraints.NotNull;
 
 public record AdminMemberStatusRequest(
-        @NotNull(message = "status는 필수입니다.")
+        @NotNull(message = "변경할 회원상태는 필수입니다.")
         MemberStatus status
 ) {}

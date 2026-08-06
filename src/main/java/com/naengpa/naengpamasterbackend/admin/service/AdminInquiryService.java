@@ -18,7 +18,9 @@ import lombok.RequiredArgsConstructor;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -34,43 +36,42 @@ public class AdminInquiryService {
     private final NotificationService notificationService;
 
     @Transactional(readOnly = true)
-    public Page<AdminInquiryResponse> getInquiries(Boolean isAnswered, Pageable pageable) {
-        if (isAnswered) {
-            return adminInquiryRepository
-                    .findByIsAnsweredAndIsDeletedFalseOrderByAnsweredAtDesc(isAnswered, pageable)
-                    .map(inquiry -> {
-                        Member member = memberRepository.findById(inquiry.getMemberId()).orElse(null);
-                        String nickname = member != null ? member.getNickname() : null;
-                        return AdminInquiryResponse.from(inquiry, nickname);
-                    });
-        }
+    public Page<AdminInquiryResponse> getInquiries(Boolean isAnswered, Sort.Direction sortDirection, Pageable pageable) {
+        boolean answered = Boolean.TRUE.equals(isAnswered);
 
-        return adminInquiryRepository.findByIsAnsweredAndIsDeletedFalseOrderByCreatedAtAsc(isAnswered, pageable)
-                .map(inquiry -> {
-                    Member member = memberRepository.findById(inquiry.getMemberId()).orElse(null);
-                    String nickname = member != null ? member.getNickname() : null;
-                    return AdminInquiryResponse.from(inquiry, nickname);
-                });
+        Sort.Direction direction = sortDirection != null
+                ? sortDirection
+                : answered
+                  ? Sort.Direction.DESC
+                  : Sort.Direction.ASC;
+
+        String sortProperty = answered
+                ? "answeredAt"
+                : "createdAt";
+
+        Pageable queryPageable = PageRequest.of(
+                pageable.getPageNumber(),
+                pageable.getPageSize(),
+                Sort.by(direction, sortProperty)
+        );
+
+        return adminInquiryRepository.findInquiryList(
+                isAnswered,
+                queryPageable
+        );
     }
 
     @Transactional(readOnly = true)
     public AdminInquiryDetailResponse getInquiryDetail(Long inquiryId) {
-        Inquiry inquiry = adminInquiryRepository.findByIdAndIsDeletedFalse(inquiryId)
+        return adminInquiryRepository.findInquiryDetail(inquiryId)
                 .orElseThrow(InquiryNotFoundException::new);
-
-        InquiryAnswer inquiryAnswer = adminInquiryAnswerRepository
-                .findByInquiryIdAndIsDeletedFalse(inquiryId).orElse(null);
-
-        Member member = memberRepository.findById(inquiry.getMemberId()).orElse(null);
-        String nickname = member != null ? member.getNickname() : null;
-        return AdminInquiryDetailResponse.from(inquiry, inquiryAnswer, nickname);
     }
 
     /**
      * 관리자 문의 답변을 등록하며, 사전 검사와 DB UNIQUE 제약으로 중복 답변을 방지한다.
      */
     @Transactional
-    public void createInquiryAnswer(Long inquiryId, AdminAnswerRequest request, String email) {
+    public void createInquiryAnswer(Long inquiryId, AdminAnswerRequest request, String adminEmail) {
         Inquiry inquiry = adminInquiryRepository.findByIdAndIsDeletedFalse(inquiryId)
                 .orElseThrow(InquiryNotFoundException::new);
 
@@ -82,7 +83,7 @@ public class AdminInquiryService {
             throw new InquiryAlreadyAnsweredException();
         }
 
-        Long adminId = resolveAdminIdOrThrow(email);
+        Long adminId = resolveAdminIdOrThrow(adminEmail);
 
         InquiryAnswer inquiryAnswer = InquiryAnswer.create(inquiryId, request.content(), adminId);
 
@@ -101,7 +102,7 @@ public class AdminInquiryService {
     }
 
     @Transactional
-    public void updateInquiryAnswer(Long inquiryId, Long answerId, AdminAnswerRequest request, String email) {
+    public void updateInquiryAnswer(Long inquiryId, Long answerId, AdminAnswerRequest request, String adminEmail) {
         adminInquiryRepository.findByIdAndIsDeletedFalse(inquiryId)
                 .orElseThrow(InquiryNotFoundException::new);
 
@@ -109,7 +110,7 @@ public class AdminInquiryService {
                 .findByIdAndInquiryIdAndIsDeletedFalse(answerId, inquiryId)
                 .orElseThrow(InquiryAnswerNotFoundException::new);
 
-        Long adminId = resolveAdminIdOrThrow(email);
+        Long adminId = resolveAdminIdOrThrow(adminEmail);
 
         inquiryAnswer.update(request.content(), adminId);
     }

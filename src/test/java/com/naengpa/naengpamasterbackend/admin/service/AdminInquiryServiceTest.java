@@ -1,10 +1,13 @@
 package com.naengpa.naengpamasterbackend.admin.service;
 
 import com.naengpa.naengpamasterbackend.admin.dto.request.AdminAnswerRequest;
+import com.naengpa.naengpamasterbackend.admin.dto.response.AdminInquiryDetailResponse;
+import com.naengpa.naengpamasterbackend.admin.dto.response.AdminInquiryResponse;
 import com.naengpa.naengpamasterbackend.admin.repository.AdminInquiryAnswerRepository;
 import com.naengpa.naengpamasterbackend.admin.repository.AdminInquiryRepository;
 import com.naengpa.naengpamasterbackend.global.exception.InquiryAlreadyAnsweredException;
 import com.naengpa.naengpamasterbackend.global.exception.InquiryAnswerNotFoundException;
+import com.naengpa.naengpamasterbackend.global.exception.InquiryNotFoundException;
 import com.naengpa.naengpamasterbackend.inquiry.entity.Inquiry;
 import com.naengpa.naengpamasterbackend.inquiry.entity.InquiryAnswer;
 import com.naengpa.naengpamasterbackend.member.entity.Member;
@@ -15,8 +18,13 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 
 import java.sql.SQLException;
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -47,6 +55,122 @@ class AdminInquiryServiceTest {
                 memberRepository,
                 notificationService
         );
+    }
+
+    @Test
+    void getInquiriesUsesCreatedAtAscendingByDefaultForPendingInquiries() {
+        Pageable requestedPageable = PageRequest.of(2, 15, Sort.by("title"));
+        Page<AdminInquiryResponse> expected = Page.empty();
+        given(adminInquiryRepository.findInquiryList(any(), any(Pageable.class)))
+                .willReturn(expected);
+
+        Page<AdminInquiryResponse> result = adminInquiryService.getInquiries(
+                false,
+                null,
+                requestedPageable
+        );
+
+        ArgumentCaptor<Boolean> answeredCaptor = ArgumentCaptor.forClass(Boolean.class);
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(adminInquiryRepository).findInquiryList(
+                answeredCaptor.capture(),
+                pageableCaptor.capture()
+        );
+
+        Pageable queryPageable = pageableCaptor.getValue();
+        Sort.Order order = queryPageable.getSort().getOrderFor("createdAt");
+        assertThat(result).isSameAs(expected);
+        assertThat(answeredCaptor.getValue()).isFalse();
+        assertThat(queryPageable.getPageNumber()).isEqualTo(2);
+        assertThat(queryPageable.getPageSize()).isEqualTo(15);
+        assertThat(order).isNotNull();
+        assertThat(order.getDirection()).isEqualTo(Sort.Direction.ASC);
+        assertThat(queryPageable.getSort().getOrderFor("answeredAt")).isNull();
+    }
+
+    @Test
+    void getInquiriesUsesAnsweredAtDescendingByDefaultForAnsweredInquiries() {
+        Pageable requestedPageable = PageRequest.of(0, 10);
+        given(adminInquiryRepository.findInquiryList(any(), any(Pageable.class)))
+                .willReturn(Page.empty());
+
+        adminInquiryService.getInquiries(true, null, requestedPageable);
+
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(adminInquiryRepository).findInquiryList(any(), pageableCaptor.capture());
+        Sort.Order order = pageableCaptor.getValue().getSort().getOrderFor("answeredAt");
+        assertThat(order).isNotNull();
+        assertThat(order.getDirection()).isEqualTo(Sort.Direction.DESC);
+        assertThat(pageableCaptor.getValue().getSort().getOrderFor("createdAt")).isNull();
+    }
+
+    @Test
+    void getInquiriesUsesRequestedAscendingDirectionForAnsweredInquiries() {
+        Pageable requestedPageable = PageRequest.of(1, 20);
+        given(adminInquiryRepository.findInquiryList(any(), any(Pageable.class)))
+                .willReturn(Page.empty());
+
+        adminInquiryService.getInquiries(true, Sort.Direction.ASC, requestedPageable);
+
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(adminInquiryRepository).findInquiryList(any(), pageableCaptor.capture());
+        Sort.Order order = pageableCaptor.getValue().getSort().getOrderFor("answeredAt");
+        assertThat(order).isNotNull();
+        assertThat(order.getDirection()).isEqualTo(Sort.Direction.ASC);
+        assertThat(pageableCaptor.getValue().getPageNumber()).isEqualTo(1);
+        assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(20);
+    }
+
+    @Test
+    void getInquiriesUsesRequestedDescendingDirectionForPendingInquiries() {
+        Pageable requestedPageable = PageRequest.of(0, 10);
+        given(adminInquiryRepository.findInquiryList(any(), any(Pageable.class)))
+                .willReturn(Page.empty());
+
+        adminInquiryService.getInquiries(false, Sort.Direction.DESC, requestedPageable);
+
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(adminInquiryRepository).findInquiryList(any(), pageableCaptor.capture());
+        Sort.Order order = pageableCaptor.getValue().getSort().getOrderFor("createdAt");
+        assertThat(order).isNotNull();
+        assertThat(order.getDirection()).isEqualTo(Sort.Direction.DESC);
+    }
+
+    @Test
+    void getInquiryDetailReturnsProjectedResponse() {
+        Long inquiryId = 1L;
+        AdminInquiryDetailResponse expected = new AdminInquiryDetailResponse(
+                inquiryId,
+                10L,
+                "문의 제목",
+                "문의 내용",
+                "회원 닉네임",
+                true,
+                LocalDateTime.of(2026, 7, 31, 10, 0),
+                2L,
+                "답변 내용",
+                20L,
+                LocalDateTime.of(2026, 7, 31, 11, 0)
+        );
+        given(adminInquiryRepository.findInquiryDetail(inquiryId))
+                .willReturn(Optional.of(expected));
+
+        AdminInquiryDetailResponse result = adminInquiryService.getInquiryDetail(inquiryId);
+
+        assertThat(result).isSameAs(expected);
+        verify(adminInquiryRepository).findInquiryDetail(inquiryId);
+        verify(adminInquiryAnswerRepository, never()).findByInquiryIdAndIsDeletedFalse(any());
+        verify(memberRepository, never()).findById(any());
+    }
+
+    @Test
+    void getInquiryDetailRejectsMissingInquiry() {
+        Long inquiryId = 1L;
+        given(adminInquiryRepository.findInquiryDetail(inquiryId))
+                .willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> adminInquiryService.getInquiryDetail(inquiryId))
+                .isInstanceOf(InquiryNotFoundException.class);
     }
 
     @Test

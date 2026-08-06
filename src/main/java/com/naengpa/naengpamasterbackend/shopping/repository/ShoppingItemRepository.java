@@ -17,4 +17,9 @@ public interface ShoppingItemRepository extends JpaRepository<ShoppingItem, Long
             Long memberId
     );
 
+    boolean existsByMemberIdAndProductIdAndIsDeletedFalseAndIsPurchasedFalse(
+            Long memberId,
+            Long productId
+    );
+
 }
