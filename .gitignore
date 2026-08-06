@@ -41,3 +41,6 @@ out/
 
 ### Secret ###
 src/main/resources/application-secret.env
+
+### Personal docs ###
+docs/

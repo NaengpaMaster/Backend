@@ -25,7 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
 
-@SpringBootTest
+@SpringBootTest(properties = "agent.enabled=false")
 @Transactional
 class AgentShoppingRecommendationServiceTests {
 

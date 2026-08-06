@@ -40,7 +40,7 @@ public class LlmUsageLog {
     @Column(name = "status", nullable = false, length = 20)
     private LlmCallStatus status;
 
-    @Column(name = "failure_message")
+    @Column(name = "failure_message", columnDefinition = "TEXT")
     private String failureMessage;
 
     @Column(name = "created_at", nullable = false)
