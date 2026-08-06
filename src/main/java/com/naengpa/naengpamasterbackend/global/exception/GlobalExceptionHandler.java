@@ -186,4 +186,12 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.fail(exception.getMessage()));
     }
+
+    @ExceptionHandler(InvalidStatisticsPeriodException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvalidStatisticsPeriodException(
+            InvalidStatisticsPeriodException exception
+    ) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.fail(exception.getMessage()));
+    }
 }

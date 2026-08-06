@@ -1,5 +1,6 @@
 package com.naengpa.naengpamasterbackend.admin.repository;
 
+import com.naengpa.naengpamasterbackend.admin.projection.DailyCountProjection;
 import com.naengpa.naengpamasterbackend.member.entity.Member;
 import com.naengpa.naengpamasterbackend.member.entity.MemberRole;
 import com.naengpa.naengpamasterbackend.member.entity.MemberStatus;
@@ -9,6 +10,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+
+import java.time.LocalDateTime;
+import java.util.List;
 
 @Repository
 public interface AdminMemberRepository extends JpaRepository<Member, Long> {
@@ -57,4 +61,61 @@ public interface AdminMemberRepository extends JpaRepository<Member, Long> {
 
     @Query("SELECT COUNT(m) FROM Member m WHERE m.role = :role AND (m.status = :status OR m.deletedAt IS NOT NULL)")
     Long countInactiveByRole(@Param("role") MemberRole role, @Param("status") MemberStatus status);
+
+    @Query(
+            value = """
+                     SELECT CAST(m.created_at AS DATE) AS date,
+                            COUNT(*) AS count
+                     FROM members m
+                     WHERE m.role = 'USER'
+                       AND m.created_at >= :startAt
+                       AND m.created_at < :endExclusive
+                    GROUP BY CAST(m.created_at AS DATE)
+                    ORDER BY date
+                    """,
+            nativeQuery = true
+    )
+    List<DailyCountProjection> countDailyNewMembers(
+            @Param("startAt") LocalDateTime startAt,
+            @Param("endExclusive") LocalDateTime endExclusive
+    );
+
+    @Query(
+            value = """
+                    SELECT CAST(h.created_at AS DATE) AS date,
+                           COUNT(DISTINCT h.member_id) AS count
+                    FROM member_status_histories h
+                    JOIN members m ON m.member_id = h.member_id
+                    WHERE m.role = 'USER'
+                      AND h.previous_status = 'ACTIVE'
+                      AND h.changed_status = 'INACTIVE'
+                      AND h.created_at >= :startAt
+                      AND h.created_at < :endExclusive
+                    GROUP BY CAST(h.created_at AS DATE)
+                    ORDER BY date
+                    """,
+            nativeQuery = true
+    )
+    List<DailyCountProjection> countDailyInactiveMembers(
+            @Param("startAt") LocalDateTime startAt,
+            @Param("endExclusive") LocalDateTime endExclusive
+    );
+
+    @Query(
+            value = """
+                    SELECT COUNT(DISTINCT h.member_id)
+                    FROM member_status_histories h
+                    JOIN members m ON m.member_id = h.member_id
+                    WHERE m.role = 'USER'
+                      AND h.previous_status = 'ACTIVE'
+                      AND h.changed_status = 'INACTIVE'
+                      AND h.created_at >= :startAt
+                      AND h.created_at < :endExclusive
+                    """,
+            nativeQuery = true
+    )
+    long countInactiveMembers(
+            @Param("startAt") LocalDateTime startAt,
+            @Param("endExclusive") LocalDateTime endExclusive
+    );
 }

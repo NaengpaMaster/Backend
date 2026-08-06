@@ -9,6 +9,8 @@ import com.naengpa.naengpamasterbackend.global.exception.MemberNotFoundException
 import com.naengpa.naengpamasterbackend.member.entity.Member;
 import com.naengpa.naengpamasterbackend.member.entity.MemberRole;
 import com.naengpa.naengpamasterbackend.member.entity.MemberStatus;
+import com.naengpa.naengpamasterbackend.member.entity.MemberStatusHistory;
+import com.naengpa.naengpamasterbackend.member.repository.MemberStatusHistoryRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -23,6 +25,7 @@ public class AdminMemberService {
 
     private final AdminMemberRepository adminMemberRepository;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final MemberStatusHistoryRepository memberStatusHistoryRepository;
 
     @Transactional(readOnly = true)
     public Page<AdminMemberResponse> getMembers(MemberRole role, MemberStatus status, String search, Pageable pageable) {
@@ -34,8 +37,19 @@ public class AdminMemberService {
     public void updateMemberStatus(Long memberId, AdminMemberStatusRequest request) {
         Member member = adminMemberRepository.findById(memberId)
                 .orElseThrow(MemberNotFoundException::new);
-        member.updateStatus(request.status());
-        if (request.status() == MemberStatus.INACTIVE) {
+
+        MemberStatus previousStatus = member.getStatus();
+        MemberStatus changedStatus = request.status();
+        if (previousStatus == changedStatus) {
+            return;
+        }
+
+        member.updateStatus(changedStatus);
+        memberStatusHistoryRepository.save(
+                MemberStatusHistory.create(memberId, previousStatus, changedStatus)
+        );
+
+        if (changedStatus == MemberStatus.INACTIVE) {
             refreshTokenRepository.findAllByMemberAndExpiredAtAfter(member, LocalDateTime.now())
                     .forEach(refreshToken -> refreshToken.expireNow());
         }
