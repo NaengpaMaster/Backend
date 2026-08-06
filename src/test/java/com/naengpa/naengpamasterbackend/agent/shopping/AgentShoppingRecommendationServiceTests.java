@@ -6,6 +6,8 @@ import com.naengpa.naengpamasterbackend.agent.shopping.service.AgentShoppingReco
 import com.naengpa.naengpamasterbackend.agent.conversation.entity.ConversationMessageRole;
 import com.naengpa.naengpamasterbackend.agent.conversation.repository.ConversationMessageRepository;
 import com.naengpa.naengpamasterbackend.agent.conversation.repository.ConversationSessionRepository;
+import com.naengpa.naengpamasterbackend.agent.usage.entity.LlmCallStatus;
+import com.naengpa.naengpamasterbackend.agent.usage.repository.LlmUsageLogRepository;
 import com.naengpa.naengpamasterbackend.member.entity.HouseholdType;
 import com.naengpa.naengpamasterbackend.member.entity.Member;
 import com.naengpa.naengpamasterbackend.member.repository.MemberRepository;
@@ -44,6 +46,9 @@ class AgentShoppingRecommendationServiceTests {
 
     @Autowired
     private ConversationMessageRepository conversationMessageRepository;
+
+    @Autowired
+    private LlmUsageLogRepository llmUsageLogRepository;
 
     @Test
     @DisplayName("AI 장보기 추천 시 미구매 장보기 항목은 제외")
@@ -168,5 +173,30 @@ class AgentShoppingRecommendationServiceTests {
         assertThat(messages)
                 .extracting(message -> message.getRole())
                 .containsExactly(ConversationMessageRole.USER, ConversationMessageRole.ASSISTANT);
+    }
+
+    @Test
+    @DisplayName("AI 장보기 추천 요청 성공 시 LLM 사용량 성공 로그가 저장된다")
+    void recommend_savesLlmSuccessUsageLog() {
+        // given
+        Member member = memberRepository.save(Member.createUser(
+                "agent-usage@test.com",
+                "password",
+                "추천사용량테스트유저",
+                HouseholdType.ONE_PERSON
+        ));
+
+        ShoppingRecommendationRequest request = new ShoppingRecommendationRequest(3);
+
+        // when
+        agentShoppingRecommendationService.recommend(member.getEmail(), request);
+
+        // then
+        var logs = llmUsageLogRepository.findByMemberIdOrderByCreatedAtDesc(member.getId());
+
+        assertThat(logs).hasSize(1);
+        assertThat(logs.get(0).getModelName()).isEqualTo("rule-based-mvp");
+        assertThat(logs.get(0).getStatus()).isEqualTo(LlmCallStatus.SUCCESS);
+        assertThat(logs.get(0).getTotalTokens()).isZero();
     }
 }
