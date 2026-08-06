@@ -2,6 +2,7 @@ package com.naengpa.naengpamasterbackend.admin.controller;
 
 import com.naengpa.naengpamasterbackend.admin.dto.response.*;
 import com.naengpa.naengpamasterbackend.admin.service.AdminStatisticsService;
+import com.naengpa.naengpamasterbackend.admin.statistics.StatisticsPeriod;
 import com.naengpa.naengpamasterbackend.global.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -10,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -52,4 +54,25 @@ public class AdminStatisticsController {
         return ResponseEntity.ok(ApiResponse.success(adminStatisticsService.getWeeklyExpiredTrend()));
     }
 
+    // 회원 현황 api
+    @GetMapping("/members")
+    public ResponseEntity<ApiResponse<AdminMemberStatisticsResponse>> getMemberStatistics(
+            @RequestParam LocalDate startDate,
+            @RequestParam LocalDate endDate
+    ) {
+        StatisticsPeriod period = StatisticsPeriod.of(startDate, endDate);
+
+        return ResponseEntity.ok(ApiResponse.success(adminStatisticsService.getMemberStatistics(period)));
+    }
+
+    // 서비스별 회원 수 이용률 api
+    @GetMapping("/service-usage")
+    public ResponseEntity<ApiResponse<AdminMemberUsageStatisticsResponse>> getServiceUsage(
+            @RequestParam LocalDate startDate,
+            @RequestParam LocalDate endDate
+    ) {
+        StatisticsPeriod period = StatisticsPeriod.of(startDate, endDate);
+
+        return ResponseEntity.ok(ApiResponse.success(adminStatisticsService.getMemberUsageStatistics(period)));
+    }
 }

@@ -15,6 +15,8 @@ import com.naengpa.naengpamasterbackend.global.exception.MemberStatusAlreadyAppl
 import com.naengpa.naengpamasterbackend.member.entity.Member;
 import com.naengpa.naengpamasterbackend.member.entity.MemberRole;
 import com.naengpa.naengpamasterbackend.member.entity.MemberStatus;
+import com.naengpa.naengpamasterbackend.member.entity.MemberStatusHistory;
+import com.naengpa.naengpamasterbackend.member.repository.MemberStatusHistoryRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -29,6 +31,7 @@ public class AdminMemberService {
 
     private final AdminMemberRepository adminMemberRepository;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final MemberStatusHistoryRepository memberStatusHistoryRepository;
 
     @Transactional(readOnly = true)
     public Page<AdminMemberResponse> getMembers(MemberRole role, MemberStatus status, String search, Pageable pageable) {
@@ -41,6 +44,7 @@ public class AdminMemberService {
         Member member = adminMemberRepository.findById(memberId)
                 .orElseThrow(MemberNotFoundException::new);
 
+        MemberStatus previousStatus = member.getStatus();
         Member admin = adminMemberRepository.findByEmail(adminEmail)
                 .orElseThrow(MemberNotFoundException::new);
 
@@ -58,6 +62,9 @@ public class AdminMemberService {
         }
 
         member.updateStatus(changedStatus);
+        memberStatusHistoryRepository.save(
+                MemberStatusHistory.create(memberId, previousStatus, changedStatus)
+        );
 
         // 회원이 비활성화되면 로그인 상태도 해제
         if (changedStatus == MemberStatus.INACTIVE) {

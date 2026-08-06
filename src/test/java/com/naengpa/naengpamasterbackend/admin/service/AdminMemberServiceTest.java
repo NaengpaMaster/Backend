@@ -12,13 +12,17 @@ import com.naengpa.naengpamasterbackend.global.exception.MemberStatusAlreadyAppl
 import com.naengpa.naengpamasterbackend.member.entity.Member;
 import com.naengpa.naengpamasterbackend.member.entity.MemberRole;
 import com.naengpa.naengpamasterbackend.member.entity.MemberStatus;
+import com.naengpa.naengpamasterbackend.member.entity.MemberStatusHistory;
+import com.naengpa.naengpamasterbackend.member.repository.MemberStatusHistoryRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
@@ -30,17 +34,23 @@ class AdminMemberServiceTest {
 
     private AdminMemberRepository adminMemberRepository;
     private RefreshTokenRepository refreshTokenRepository;
+    private MemberStatusHistoryRepository memberStatusHistoryRepository;
     private AdminMemberService adminMemberService;
 
     @BeforeEach
     void setUp() {
         adminMemberRepository = mock(AdminMemberRepository.class);
         refreshTokenRepository = mock(RefreshTokenRepository.class);
-        adminMemberService = new AdminMemberService(adminMemberRepository, refreshTokenRepository);
+        memberStatusHistoryRepository = mock(MemberStatusHistoryRepository.class);
+        adminMemberService = new AdminMemberService(
+                adminMemberRepository,
+                refreshTokenRepository,
+                memberStatusHistoryRepository
+        );
     }
 
     @Test
-    void updateMemberStatusDeactivatesAnotherMember() {
+    void updateMemberStatusDeactivatesAnotherMemberAndSavesHistory() {
         Member member = member(1L, MemberRole.USER, MemberStatus.ACTIVE);
         Member admin = member(2L, MemberRole.ADMIN, MemberStatus.ACTIVE);
         given(adminMemberRepository.findById(1L)).willReturn(Optional.of(member));
@@ -53,14 +63,19 @@ class AdminMemberServiceTest {
                 1L, new AdminMemberStatusRequest(MemberStatus.INACTIVE), "admin@example.com"
         );
 
+        ArgumentCaptor<MemberStatusHistory> captor = ArgumentCaptor.forClass(MemberStatusHistory.class);
         verify(member).updateStatus(MemberStatus.INACTIVE);
+        verify(memberStatusHistoryRepository).save(captor.capture());
+        assertThat(captor.getValue().getMemberId()).isEqualTo(1L);
+        assertThat(captor.getValue().getPreviousStatus()).isEqualTo(MemberStatus.ACTIVE);
+        assertThat(captor.getValue().getChangedStatus()).isEqualTo(MemberStatus.INACTIVE);
         verify(refreshTokenRepository).findAllByMemberAndExpiredAtAfter(
                 any(Member.class), any(LocalDateTime.class)
         );
     }
 
     @Test
-    void updateMemberStatusActivatesMemberWithoutLookingUpRefreshTokens() {
+    void updateMemberStatusActivatesMemberAndSavesHistoryWithoutLookingUpRefreshTokens() {
         Member member = member(1L, MemberRole.USER, MemberStatus.INACTIVE);
         Member admin = member(2L, MemberRole.ADMIN, MemberStatus.ACTIVE);
         given(adminMemberRepository.findById(1L)).willReturn(Optional.of(member));
@@ -71,6 +86,7 @@ class AdminMemberServiceTest {
         );
 
         verify(member).updateStatus(MemberStatus.ACTIVE);
+        verify(memberStatusHistoryRepository).save(any(MemberStatusHistory.class));
         verify(refreshTokenRepository, never()).findAllByMemberAndExpiredAtAfter(any(), any());
     }
 
@@ -86,6 +102,7 @@ class AdminMemberServiceTest {
         )).isInstanceOf(MemberStatusAlreadyAppliedException.class);
 
         verify(member, never()).updateStatus(any());
+        verify(memberStatusHistoryRepository, never()).save(any());
     }
 
     @Test
@@ -99,6 +116,7 @@ class AdminMemberServiceTest {
         )).isInstanceOf(InvalidMemberStatusChangeException.class);
 
         verify(admin, never()).updateStatus(any());
+        verify(memberStatusHistoryRepository, never()).save(any());
     }
 
     @Test
