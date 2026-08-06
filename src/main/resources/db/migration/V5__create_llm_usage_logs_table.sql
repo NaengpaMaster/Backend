@@ -1,4 +1,4 @@
-CREATE TABLE llm_usage_logs (
+CREATE TABLE IF NOT EXISTS llm_usage_logs (
     llm_usage_log_id BIGSERIAL PRIMARY KEY,
     member_id BIGINT NOT NULL,
     model_name VARCHAR(100) NOT NULL,
@@ -18,8 +18,8 @@ CREATE TABLE llm_usage_logs (
         CHECK (status IN ('SUCCESS', 'FAILED'))
 );
 
-CREATE INDEX idx_llm_usage_logs_member_id
+CREATE INDEX IF NOT EXISTS idx_llm_usage_logs_member_id
     ON llm_usage_logs(member_id);
 
-CREATE INDEX idx_llm_usage_logs_member_created_at
+CREATE INDEX IF NOT EXISTS idx_llm_usage_logs_member_created_at
     ON llm_usage_logs(member_id, created_at DESC);
