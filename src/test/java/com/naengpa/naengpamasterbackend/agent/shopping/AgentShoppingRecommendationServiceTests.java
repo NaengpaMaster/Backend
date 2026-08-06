@@ -26,6 +26,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
 
@@ -98,6 +100,38 @@ class AgentShoppingRecommendationServiceTests {
                 .doesNotContain(shoppingProduct.getProductId());
 
         assertThat(result.items()).hasSizeLessThanOrEqualTo(20);
+    }
+
+    @Test
+    @DisplayName("AI 장보기 재추천 시 요청에서 제외한 상품은 추천하지 않는다")
+    void recommend_excludesRequestedProductIds() {
+        // given
+        Member member = memberRepository.save(Member.createUser(
+                "agent-request-exclude@test.com",
+                "password",
+                "추천요청제외테스트유저",
+                HouseholdType.ONE_PERSON
+        ));
+
+        Product excludedProduct = productRepository.save(Product.create(
+                1L,
+                "재추천제외재료",
+                7
+        ));
+
+        ShoppingRecommendationRequest request = new ShoppingRecommendationRequest(
+                20,
+                List.of(excludedProduct.getProductId())
+        );
+
+        // when
+        ShoppingRecommendationResponse result =
+                agentShoppingRecommendationService.recommend(member.getEmail(), request);
+
+        // then
+        assertThat(result.items())
+                .extracting(ShoppingRecommendationItemResponse::productId)
+                .doesNotContain(excludedProduct.getProductId());
     }
 
     @Test
