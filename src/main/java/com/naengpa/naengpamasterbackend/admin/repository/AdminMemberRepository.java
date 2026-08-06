@@ -65,25 +65,26 @@ public interface AdminMemberRepository extends JpaRepository<Member, Long> {
 
     @Query(
             value = """
-                     SELECT CAST(m.created_at AS DATE) AS date,
+                     SELECT CAST(DATE_TRUNC(CAST(:granularity AS TEXT), m.created_at) AS DATE) AS date,
                             COUNT(*) AS count
                      FROM members m
                      WHERE m.role = 'USER'
                        AND m.created_at >= :startAt
                        AND m.created_at < :endExclusive
-                    GROUP BY CAST(m.created_at AS DATE)
+                    GROUP BY 1
                     ORDER BY date
                     """,
             nativeQuery = true
     )
     List<DailyCountProjection> countDailyNewMembers(
             @Param("startAt") LocalDateTime startAt,
-            @Param("endExclusive") LocalDateTime endExclusive
+            @Param("endExclusive") LocalDateTime endExclusive,
+            @Param("granularity") String granularity
     );
 
     @Query(
             value = """
-                    SELECT CAST(h.created_at AS DATE) AS date,
+                    SELECT CAST(DATE_TRUNC(CAST(:granularity AS TEXT), h.created_at) AS DATE) AS date,
                            COUNT(DISTINCT h.member_id) AS count
                     FROM member_status_histories h
                     JOIN members m ON m.member_id = h.member_id
@@ -92,14 +93,15 @@ public interface AdminMemberRepository extends JpaRepository<Member, Long> {
                       AND h.changed_status = 'INACTIVE'
                       AND h.created_at >= :startAt
                       AND h.created_at < :endExclusive
-                    GROUP BY CAST(h.created_at AS DATE)
+                    GROUP BY 1
                     ORDER BY date
                     """,
             nativeQuery = true
     )
     List<DailyCountProjection> countDailyInactiveMembers(
             @Param("startAt") LocalDateTime startAt,
-            @Param("endExclusive") LocalDateTime endExclusive
+            @Param("endExclusive") LocalDateTime endExclusive,
+            @Param("granularity") String granularity
     );
 
     @Query(

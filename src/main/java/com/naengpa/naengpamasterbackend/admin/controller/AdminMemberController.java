@@ -3,6 +3,7 @@ package com.naengpa.naengpamasterbackend.admin.controller;
 import com.naengpa.naengpamasterbackend.admin.dto.request.AdminMemberRoleRequest;
 import com.naengpa.naengpamasterbackend.admin.dto.request.AdminMemberStatusRequest;
 import com.naengpa.naengpamasterbackend.admin.dto.response.AdminMemberResponse;
+import com.naengpa.naengpamasterbackend.admin.dto.response.AdminMemberDetailResponse;
 import com.naengpa.naengpamasterbackend.admin.service.AdminMemberService;
 import com.naengpa.naengpamasterbackend.global.response.ApiResponse;
 import com.naengpa.naengpamasterbackend.member.entity.MemberRole;
@@ -34,6 +35,13 @@ public class AdminMemberController {
             @RequestParam(required = false) String search) {
 
         return ResponseEntity.ok(ApiResponse.success(adminMemberService.getMembers(role, status, search, pageable)));
+    }
+
+    // 회원 상세 조회
+    @GetMapping("/{memberId}")
+    public ResponseEntity<ApiResponse<AdminMemberDetailResponse>> getMemberDetail(
+            @PathVariable Long memberId) {
+        return ResponseEntity.ok(ApiResponse.success(adminMemberService.getMemberDetail(memberId)));
     }
 
     // 회원 status 변경
