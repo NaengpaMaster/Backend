@@ -35,4 +35,8 @@ public record StatisticsPeriod(
     public LocalDateTime endExclusive() {
         return endDate.plusDays(1).atStartOfDay();
     }
+
+    public StatisticsGranularity granularity() {
+        return StatisticsGranularity.from(startDate, endDate);
+    }
 }

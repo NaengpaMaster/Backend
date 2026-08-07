@@ -3,6 +3,9 @@ package com.naengpa.naengpamasterbackend.admin.service;
 import com.naengpa.naengpamasterbackend.admin.dto.request.AdminMemberRoleRequest;
 import com.naengpa.naengpamasterbackend.admin.dto.request.AdminMemberStatusRequest;
 import com.naengpa.naengpamasterbackend.admin.dto.response.AdminMemberResponse;
+import com.naengpa.naengpamasterbackend.admin.dto.response.AdminMemberDetailResponse;
+import com.naengpa.naengpamasterbackend.admin.dto.response.AdminMemberStatusHistoryResponse;
+import com.naengpa.naengpamasterbackend.admin.statistics.StatisticsPeriod;
 import com.naengpa.naengpamasterbackend.admin.repository.AdminMemberRepository;
 import com.naengpa.naengpamasterbackend.global.auth.entity.RefreshToken;
 import com.naengpa.naengpamasterbackend.global.auth.repository.RefreshTokenRepository;
@@ -17,6 +20,8 @@ import com.naengpa.naengpamasterbackend.member.entity.MemberRole;
 import com.naengpa.naengpamasterbackend.member.entity.MemberStatus;
 import com.naengpa.naengpamasterbackend.member.entity.MemberStatusHistory;
 import com.naengpa.naengpamasterbackend.member.repository.MemberStatusHistoryRepository;
+import com.naengpa.naengpamasterbackend.score.entity.Score;
+import com.naengpa.naengpamasterbackend.score.repository.ScoreRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -32,11 +37,35 @@ public class AdminMemberService {
     private final AdminMemberRepository adminMemberRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final MemberStatusHistoryRepository memberStatusHistoryRepository;
+    private final ScoreRepository scoreRepository;
 
     @Transactional(readOnly = true)
     public Page<AdminMemberResponse> getMembers(MemberRole role, MemberStatus status, String search, Pageable pageable) {
         return adminMemberRepository.findMembers(role, status, search, pageable)
                 .map(AdminMemberResponse::from);
+    }
+
+    @Transactional(readOnly = true)
+    public AdminMemberDetailResponse getMemberDetail(Long memberId) {
+        Member member = adminMemberRepository.findById(memberId)
+                .orElseThrow(MemberNotFoundException::new);
+        Integer naengpaScore = scoreRepository.findByMemberId(memberId)
+                .map(Score::getScore)
+                .orElse(null);
+
+        return AdminMemberDetailResponse.of(member, naengpaScore);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<AdminMemberStatusHistoryResponse> getMemberStatusHistories(
+            StatisticsPeriod period,
+            Pageable pageable
+    ) {
+        return memberStatusHistoryRepository.findAdminStatusHistories(
+                period.startAt(),
+                period.endExclusive(),
+                pageable
+        );
     }
 
     @Transactional
