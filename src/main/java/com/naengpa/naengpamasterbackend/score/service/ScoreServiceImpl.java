@@ -3,11 +3,14 @@ package com.naengpa.naengpamasterbackend.score.service;
 import com.naengpa.naengpamasterbackend.global.exception.ScoreNotFoundException;
 import com.naengpa.naengpamasterbackend.member.entity.Member;
 import com.naengpa.naengpamasterbackend.member.repository.MemberRepository;
+import com.naengpa.naengpamasterbackend.score.dto.response.ScoreByReasonResponse;
 import com.naengpa.naengpamasterbackend.score.dto.response.ScoreHistoryResponse;
 import com.naengpa.naengpamasterbackend.score.dto.response.ScoreResponse;
+import com.naengpa.naengpamasterbackend.score.dto.response.ScoreSummaryResponse;
 import com.naengpa.naengpamasterbackend.score.entity.Score;
 import com.naengpa.naengpamasterbackend.score.entity.ScoreHistory;
 import com.naengpa.naengpamasterbackend.score.entity.ScoreReason;
+import com.naengpa.naengpamasterbackend.score.repository.ScoreAnalysisRepository;
 import com.naengpa.naengpamasterbackend.score.repository.ScoreHistoryRepository;
 import com.naengpa.naengpamasterbackend.score.repository.ScoreRepository;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +20,11 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.Comparator;
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 public class ScoreServiceImpl implements ScoreService {
@@ -24,6 +32,7 @@ public class ScoreServiceImpl implements ScoreService {
     private final ScoreRepository scoreRepository;
     private final MemberRepository memberRepository;
     private final ScoreHistoryRepository scoreHistoryRepository;
+    private final ScoreAnalysisRepository scoreAnalysisRepository;
 
     @Override
     public ScoreResponse getScore(String email) {
@@ -67,6 +76,37 @@ public class ScoreServiceImpl implements ScoreService {
         scoreHistoryRepository.save(
                 ScoreHistory.create(memberId, reason, targetName, targetId, null, appliedDelta)
         );
+    }
+
+    @Override
+    public List<ScoreByReasonResponse> getScoreByReason(String email) {
+
+        Member member = memberRepository.findByEmail(email)
+                .orElseThrow(() -> new UsernameNotFoundException("회원을 찾을 수 없습니다."));
+
+        LocalDateTime startOfMonth = LocalDate.now().withDayOfMonth(1).atStartOfDay();
+
+        return scoreAnalysisRepository.findScoreSummaryByReason(member.getId(), startOfMonth);
+    }
+
+    @Override
+    public ScoreSummaryResponse getSummary(String email) {
+        Member member = memberRepository.findByEmail(email)
+                .orElseThrow(() -> new UsernameNotFoundException("회원을 찾을 수 없습니다."));
+
+        LocalDateTime startOfMonth = LocalDate.now().withDayOfMonth(1).atStartOfDay();
+
+        return scoreAnalysisRepository.findSummary(member.getId(), startOfMonth);
+    }
+
+    @Override
+    public ScoreByReasonResponse getHighlight(String email){
+
+        List<ScoreByReasonResponse> byReason = getScoreByReason(email);
+
+        return byReason.stream()
+                .max(Comparator.comparingLong(r -> Math.abs(r.totalDelta())))
+                .orElse(null);
     }
 
 }

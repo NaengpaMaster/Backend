@@ -8,4 +8,5 @@ import org.springframework.data.domain.Pageable;
 public interface ScoreHistoryRepository extends JpaRepository<ScoreHistory, Long> {
 
     Page<ScoreHistory> findByMemberIdOrderByCreatedAtDesc(Long memberId, Pageable pageable);
+
 }
