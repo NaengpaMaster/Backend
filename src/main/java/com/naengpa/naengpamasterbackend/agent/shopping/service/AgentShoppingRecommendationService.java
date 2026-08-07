@@ -97,6 +97,9 @@ public class AgentShoppingRecommendationService {
                     .map(memberExcludedProduct -> memberExcludedProduct.getProduct().getProductId())
                     .forEach(excludedProductIds::add);
 
+            // 사용자가 재추천을 누른 경우, 화면에 이미 노출된 추천 재료도 다음 후보에서 제외
+            excludedProductIds.addAll(request.excludeProductIds());
+
             // 선호 음식은 Product 카테고리와 직접 매핑하지 않고, Agent의 추천 판단 기준으로 전달
             List<String> favoriteFoods = memberFavoriteFoodRepository.findAllByMemberOrderByIdAsc(member).stream()
                     .map(memberFavoriteFood -> memberFavoriteFood.getFoodCategory().getName())
