@@ -37,9 +37,10 @@ public class ShoppingItemController {
     public ResponseEntity<ApiResponse<ShoppingItemResponse>> createShoppingItem(
             @Parameter(hidden = true)
             Authentication authentication,
+            @RequestParam(required = false) Long fridgeId,
             @Valid @RequestBody ShoppingItemCreateRequest request
             ) {
-        ShoppingItemResponse response = shoppingItemService.createShoppingItem(authentication.getName(), request);
+        ShoppingItemResponse response = shoppingItemService.createShoppingItem(authentication.getName(), fridgeId, request);
 
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("장보기 재료가 등록되었습니다.", response));
@@ -51,10 +52,11 @@ public class ShoppingItemController {
     @GetMapping
     public ResponseEntity<ApiResponse<List<ShoppingItemListResponse>>> findShoppingItems(
             @Parameter(hidden = true)
-            Authentication authentication
+            Authentication authentication,
+            @RequestParam(required = false) Long fridgeId
     ) {
         return ResponseEntity.ok(
-                ApiResponse.success(shoppingItemService.findShoppingItems(authentication.getName()))
+                ApiResponse.success(shoppingItemService.findShoppingItems(authentication.getName(), fridgeId))
         );
     }
 
@@ -65,9 +67,10 @@ public class ShoppingItemController {
             @Parameter(hidden = true)
             Authentication authentication,
             @Parameter(description = "장보기 항목 ID", example = "1", required = true)
-            @Valid @PathVariable Long shoppingItemId
+            @Valid @PathVariable Long shoppingItemId,
+            @RequestParam(required = false) Long fridgeId
     ) {
-        shoppingItemService.deleteShoppingItem(authentication.getName(), shoppingItemId);
+        shoppingItemService.deleteShoppingItem(authentication.getName(), shoppingItemId, fridgeId);
         return ResponseEntity.ok(
                 ApiResponse.success("장보기 항목이 삭제되었습니다.", null)
         );
@@ -81,11 +84,13 @@ public class ShoppingItemController {
             Authentication authentication,
             @Parameter(description = "장보기 항목 ID", example = "1", required = true)
             @PathVariable Long shoppingItemId,
+            @RequestParam(required = false) Long fridgeId,
             @Valid @RequestBody ShoppingItemCheckRequest request
     ) {
         ShoppingItemResponse response = shoppingItemService.updateShoppingItemPurchased(
                 authentication.getName(),
                 shoppingItemId,
+                fridgeId,
                 request
         );
 
@@ -100,11 +105,13 @@ public class ShoppingItemController {
             Authentication authentication,
             @Parameter(description = "장보기 항목 ID", example = "1", required = true)
             @PathVariable Long shoppingItemId,
+            @RequestParam(required = false) Long fridgeId,
             @Valid @RequestBody ShoppingItemUpdateRequest request
     ) {
         ShoppingItemResponse response = shoppingItemService.updateShoppingItem(
                 authentication.getName(),
                 shoppingItemId,
+                fridgeId,
                 request
         );
 
@@ -119,11 +126,13 @@ public class ShoppingItemController {
             Authentication authentication,
             @Parameter(description = "장보기 항목 ID", example = "1", required = true)
             @PathVariable Long shoppingItemId,
+            @RequestParam(required = false) Long fridgeId,
             @Valid @RequestBody(required = false) ShoppingItemMoveToFridgeRequest request
     ) {
         FridgeItemResponse response = shoppingItemService.moveShoppingItemToFridge(
                 authentication.getName(),
                 shoppingItemId,
+                fridgeId,
                 request
         );
 

@@ -15,6 +15,7 @@ import com.naengpa.naengpamasterbackend.global.exception.NicknameGenerationFaile
 import com.naengpa.naengpamasterbackend.global.exception.PasswordMismatchException;
 import com.naengpa.naengpamasterbackend.global.exception.WithdrawnEmailException;
 import com.naengpa.naengpamasterbackend.global.security.JwtTokenProvider;
+import com.naengpa.naengpamasterbackend.fridge.service.FridgeService;
 import com.naengpa.naengpamasterbackend.member.entity.FoodCategory;
 import com.naengpa.naengpamasterbackend.member.entity.Member;
 import com.naengpa.naengpamasterbackend.member.entity.MemberExcludedProduct;
@@ -64,6 +65,7 @@ public class AuthService {
     private final ScoreRepository scoreRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final EmailVerificationService emailVerificationService;
+    private final FridgeService fridgeService;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
 
@@ -89,6 +91,7 @@ public class AuthService {
                 request.householdType()
         );
         Member savedMember = memberRepository.save(member);
+        fridgeService.createDefaultFridge(savedMember);
         scoreRepository.save(Score.createInitial(savedMember.getId()));
         return MemberResponse.from(savedMember);
     }

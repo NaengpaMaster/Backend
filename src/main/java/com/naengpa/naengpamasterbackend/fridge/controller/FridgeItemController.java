@@ -1,10 +1,13 @@
 package com.naengpa.naengpamasterbackend.fridge.controller;
 
 import com.naengpa.naengpamasterbackend.fridge.dto.request.FridgeItemCreateRequest;
+import com.naengpa.naengpamasterbackend.fridge.dto.request.FridgeItemShareRequestCreateRequest;
+import com.naengpa.naengpamasterbackend.fridge.dto.request.FridgeItemTransferRequest;
 import com.naengpa.naengpamasterbackend.fridge.dto.request.FridgeItemUpdateRequest;
 import com.naengpa.naengpamasterbackend.fridge.dto.request.FridgeItemUsePartialRequest;
 import com.naengpa.naengpamasterbackend.fridge.dto.response.FridgeItemListResponse;
 import com.naengpa.naengpamasterbackend.fridge.dto.response.FridgeItemResponse;
+import com.naengpa.naengpamasterbackend.fridge.dto.response.FridgeItemShareRequestResponse;
 import com.naengpa.naengpamasterbackend.fridge.service.FridgeItemService;
 import com.naengpa.naengpamasterbackend.global.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -36,8 +39,9 @@ public class FridgeItemController {
     public ResponseEntity<ApiResponse<FridgeItemResponse>> createFridgeItem(
             @Parameter(hidden = true)
             Authentication authentication,
+            @RequestParam(required = false) Long fridgeId,
             @Valid @RequestBody FridgeItemCreateRequest request) {
-        FridgeItemResponse response = fridgeItemService.createFridgeItem(authentication.getName(), request);
+        FridgeItemResponse response = fridgeItemService.createFridgeItem(authentication.getName(), fridgeId, request);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("냉장고 재료가 등록되었습니다.", response));
     }
@@ -46,9 +50,10 @@ public class FridgeItemController {
     @Operation(summary = "냉장고 재료 목록 조회", description = "로그인한 사용자의 냉장고 재료 목록을 조회합니다.")
     @GetMapping
     public ResponseEntity<ApiResponse<List<FridgeItemListResponse>>> findFridgeItems(
-            @Parameter(hidden = true) Authentication authentication
+            @Parameter(hidden = true) Authentication authentication,
+            @RequestParam(required = false) Long fridgeId
     ) {
-        return ResponseEntity.ok(ApiResponse.success(fridgeItemService.findFridgeItem(authentication.getName())));
+        return ResponseEntity.ok(ApiResponse.success(fridgeItemService.findFridgeItem(authentication.getName(), fridgeId)));
     }
 
     //냉장고 카테고리별 조회
@@ -58,10 +63,11 @@ public class FridgeItemController {
             @Parameter(hidden = true)
             Authentication authentication,
             @Parameter(description = "카테고리 ID", example = "1", required = true)
-            @PathVariable Long categoryId
+            @PathVariable Long categoryId,
+            @RequestParam(required = false) Long fridgeId
     ) {
         return ResponseEntity.ok(
-                ApiResponse.success(fridgeItemService.findFridgeItemsByCategory(authentication.getName(), categoryId))
+                ApiResponse.success(fridgeItemService.findFridgeItemsByCategory(authentication.getName(), categoryId, fridgeId))
         );
     }
 
@@ -73,9 +79,10 @@ public class FridgeItemController {
             Authentication authentication,
             @Parameter(description = "냉장고 재료 ID", example = "1", required = true)
             @PathVariable Long fridgeItemId,
+            @RequestParam(required = false) Long fridgeId,
             @Valid @RequestBody FridgeItemUpdateRequest request
     ) {
-        FridgeItemResponse response = fridgeItemService.updateFridgeItem(authentication.getName(), fridgeItemId, request);
+        FridgeItemResponse response = fridgeItemService.updateFridgeItem(authentication.getName(), fridgeItemId, fridgeId, request);
         return ResponseEntity.ok(ApiResponse.success("냉장고 재료가 수정되었습니다.", response));
     }
 
@@ -86,9 +93,10 @@ public class FridgeItemController {
             @Parameter(hidden = true)
             Authentication authentication,
             @Parameter(description = "냉장고 재료 ID", example = "1", required = true)
-            @PathVariable Long fridgeItemId
+            @PathVariable Long fridgeItemId,
+            @RequestParam(required = false) Long fridgeId
     ) {
-        fridgeItemService.deleteFridgeItem(authentication.getName(), fridgeItemId);
+        fridgeItemService.deleteFridgeItem(authentication.getName(), fridgeItemId, fridgeId);
         return ResponseEntity.ok(ApiResponse.success("냉장고 재료가 삭제되었습니다.", null));
     }
 
@@ -99,9 +107,10 @@ public class FridgeItemController {
             @Parameter(hidden = true)
             Authentication authentication,
             @Parameter(description = "냉장고 재료 ID", example = "1", required = true)
-            @PathVariable Long fridgeItemId
+            @PathVariable Long fridgeItemId,
+            @RequestParam(required = false) Long fridgeId
     ) {
-        fridgeItemService.useAllFridgeItem(authentication.getName(), fridgeItemId);
+        fridgeItemService.useAllFridgeItem(authentication.getName(), fridgeItemId, fridgeId);
         return ResponseEntity.ok(ApiResponse.success("냉장고 재료를 전부 사용 처리했습니다.", null));
     }
 
@@ -113,14 +122,51 @@ public class FridgeItemController {
             Authentication authentication,
             @Parameter(description = "냉장고 재료 ID", example = "1", required = true)
             @PathVariable Long fridgeItemId,
+            @RequestParam(required = false) Long fridgeId,
             @Valid @RequestBody FridgeItemUsePartialRequest request
     ) {
         FridgeItemResponse response = fridgeItemService.usePartialFridgeItem(
                 authentication.getName(),
                 fridgeItemId,
+                fridgeId,
                 request
         );
         return ResponseEntity.ok(ApiResponse.success("냉장고 재료를 일부 사용 처리했습니다.", response));
+    }
+
+    @Operation(summary = "냉장고 재료 전달", description = "내가 접근 가능한 냉장고의 재료 일부 또는 전체를 다른 접근 가능한 냉장고로 전달합니다.")
+    @PostMapping("/{fridgeItemId}/transfer")
+    public ResponseEntity<ApiResponse<FridgeItemResponse>> transferFridgeItem(
+            @Parameter(hidden = true)
+            Authentication authentication,
+            @Parameter(description = "보낼 냉장고 재료 ID", example = "1", required = true)
+            @PathVariable Long fridgeItemId,
+            @Valid @RequestBody FridgeItemTransferRequest request
+    ) {
+        FridgeItemResponse response = fridgeItemService.transferFridgeItem(
+                authentication.getName(),
+                fridgeItemId,
+                request
+        );
+        return ResponseEntity.ok(ApiResponse.success("식재료를 전달했습니다.", response));
+    }
+
+    @Operation(summary = "냉장고 재료 요청", description = "공유 냉장고의 특정 재료를 내 냉장고로 요청하고 재료 등록자에게 알림을 보냅니다.")
+    @PostMapping("/{fridgeItemId}/request")
+    public ResponseEntity<ApiResponse<FridgeItemShareRequestResponse>> requestFridgeItem(
+            @Parameter(hidden = true)
+            Authentication authentication,
+            @Parameter(description = "요청할 냉장고 재료 ID", example = "1", required = true)
+            @PathVariable Long fridgeItemId,
+            @Valid @RequestBody FridgeItemShareRequestCreateRequest request
+    ) {
+        FridgeItemShareRequestResponse response = fridgeItemService.requestFridgeItem(
+                authentication.getName(),
+                fridgeItemId,
+                request
+        );
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success("식재료 요청을 보냈습니다.", response));
     }
 
     //유통기한 임박 재료 조회

@@ -12,13 +12,27 @@ public interface ShoppingItemRepository extends JpaRepository<ShoppingItem, Long
 
     List<ShoppingItem> findByMemberIdAndIsDeletedFalse(Long memberId);
 
+    List<ShoppingItem> findByFridgeIdAndIsDeletedFalse(Long fridgeId);
+
+    List<ShoppingItem> findByFridgeIdAndMemberIdAndIsDeletedFalse(Long fridgeId, Long memberId);
+
     Optional<ShoppingItem> findByShoppingItemIdAndMemberIdAndIsDeletedFalse(
             Long shoppingItemId,
             Long memberId
     );
 
+    Optional<ShoppingItem> findByShoppingItemIdAndFridgeIdAndIsDeletedFalse(
+            Long shoppingItemId,
+            Long fridgeId
+    );
+
     boolean existsByMemberIdAndProductIdAndIsDeletedFalseAndIsPurchasedFalse(
             Long memberId,
+            Long productId
+    );
+
+    boolean existsByFridgeIdAndProductIdAndIsDeletedFalseAndIsPurchasedFalse(
+            Long fridgeId,
             Long productId
     );
 

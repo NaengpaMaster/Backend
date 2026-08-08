@@ -1,7 +1,11 @@
 package com.naengpa.naengpamasterbackend.shopping.service;
 
 import com.naengpa.naengpamasterbackend.fridge.entity.FridgeItem;
+import com.naengpa.naengpamasterbackend.fridge.entity.FridgeItemHistory;
+import com.naengpa.naengpamasterbackend.fridge.entity.FridgeItemHistoryAction;
 import com.naengpa.naengpamasterbackend.fridge.dto.response.FridgeItemResponse;
+import com.naengpa.naengpamasterbackend.fridge.entity.Fridge;
+import com.naengpa.naengpamasterbackend.fridge.repository.FridgeItemHistoryRepository;
 import com.naengpa.naengpamasterbackend.fridge.repository.FridgeItemRepository;
 import com.naengpa.naengpamasterbackend.fridge.service.FridgeService;
 import com.naengpa.naengpamasterbackend.global.exception.DuplicateShoppingItemException;
@@ -11,7 +15,6 @@ import com.naengpa.naengpamasterbackend.member.repository.MemberRepository;
 import com.naengpa.naengpamasterbackend.product.entity.Product;
 import com.naengpa.naengpamasterbackend.product.exception.ProductNotFoundException;
 import com.naengpa.naengpamasterbackend.product.repository.ProductRepository;
-import com.naengpa.naengpamasterbackend.product.service.ProductService;
 import com.naengpa.naengpamasterbackend.shopping.dto.request.ShoppingItemCheckRequest;
 import com.naengpa.naengpamasterbackend.shopping.dto.request.ShoppingItemCreateRequest;
 import com.naengpa.naengpamasterbackend.shopping.dto.request.ShoppingItemMoveToFridgeRequest;
@@ -19,6 +22,9 @@ import com.naengpa.naengpamasterbackend.shopping.dto.request.ShoppingItemUpdateR
 import com.naengpa.naengpamasterbackend.shopping.dto.response.ShoppingItemListResponse;
 import com.naengpa.naengpamasterbackend.shopping.dto.response.ShoppingItemResponse;
 import com.naengpa.naengpamasterbackend.shopping.entity.ShoppingItem;
+import com.naengpa.naengpamasterbackend.shopping.entity.ShoppingItemHistory;
+import com.naengpa.naengpamasterbackend.shopping.entity.ShoppingItemHistoryAction;
+import com.naengpa.naengpamasterbackend.shopping.repository.ShoppingItemHistoryRepository;
 import com.naengpa.naengpamasterbackend.shopping.repository.ShoppingItemRepository;
 import jakarta.validation.Valid;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -33,25 +39,28 @@ public class ShoppingItemService {
 
     private final ShoppingItemRepository shoppingItemRepository;
     private final MemberRepository memberRepository;
-    private final ProductService productService;
     private final ProductRepository productRepository;
     private final FridgeItemRepository fridgeItemRepository;
+    private final FridgeItemHistoryRepository fridgeItemHistoryRepository;
     private final FridgeService fridgeService;
+    private final ShoppingItemHistoryRepository shoppingItemHistoryRepository;
 
     public ShoppingItemService(
             ShoppingItemRepository shoppingItemRepository,
             MemberRepository memberRepository,
-            ProductService productService,
             ProductRepository productRepository,
             FridgeItemRepository fridgeItemRepository,
-            FridgeService fridgeService
+            FridgeItemHistoryRepository fridgeItemHistoryRepository,
+            FridgeService fridgeService,
+            ShoppingItemHistoryRepository shoppingItemHistoryRepository
             ) {
         this.shoppingItemRepository = shoppingItemRepository;
         this.memberRepository = memberRepository;
-        this.productService = productService;
         this.productRepository = productRepository;
         this.fridgeItemRepository = fridgeItemRepository;
+        this.fridgeItemHistoryRepository = fridgeItemHistoryRepository;
         this.fridgeService = fridgeService;
+        this.shoppingItemHistoryRepository = shoppingItemHistoryRepository;
     }
 
     //회원 인증 공통 로직
@@ -60,45 +69,83 @@ public class ShoppingItemService {
                 .orElseThrow(() -> new BadCredentialsException("회원을 찾을 수 없습니다."));
     }
 
-    private ShoppingItem findOwnedShoppingItem(Long shoppingItemId, Long memberId) {
-        return shoppingItemRepository.findByShoppingItemIdAndMemberIdAndIsDeletedFalse(shoppingItemId, memberId)
+    private ShoppingItem findAccessibleShoppingItem(Long shoppingItemId, Long fridgeId) {
+        return shoppingItemRepository.findByShoppingItemIdAndFridgeIdAndIsDeletedFalse(shoppingItemId, fridgeId)
                 .orElseThrow(ShoppingItemNotFoundException::new);
     }
 
+    private Product findProduct(Long productId) {
+        return productRepository
+                .findById(productId)
+                .orElseThrow(() -> new ProductNotFoundException(productId));
+    }
+
+    private Long resolveFridgeId(Member member, Long fridgeId) {
+        if (fridgeId == null) {
+            return fridgeService.getMyActiveFridge(member).getFridgeId();
+        }
+        Fridge fridge = fridgeService.getAccessibleFridge(fridgeId, member.getId());
+        return fridge.getFridgeId();
+    }
+
+    private void saveShoppingHistory(
+            ShoppingItem shoppingItem,
+            Long actorMemberId,
+            ShoppingItemHistoryAction actionType,
+            String productName
+    ) {
+        shoppingItemHistoryRepository.save(
+                ShoppingItemHistory.create(shoppingItem, actorMemberId, actionType, productName)
+        );
+    }
+
     //장보기 등록
+    @Transactional
     public ShoppingItemResponse createShoppingItem(String email , @Valid ShoppingItemCreateRequest request) {
+        return createShoppingItem(email, null, request);
+    }
+
+    @Transactional
+    public ShoppingItemResponse createShoppingItem(String email, Long fridgeId, @Valid ShoppingItemCreateRequest request) {
         Member member = findMemberByEmail(email);
+        Long targetFridgeId = resolveFridgeId(member, fridgeId);
 
         //존재하는 사전 재료인지
-        productService.validateExists(request.productId());
+        Product product = findProduct(request.productId());
 
         //중복 체크
-        if (shoppingItemRepository.existsByMemberIdAndProductIdAndIsDeletedFalseAndIsPurchasedFalse(
-                member.getId(),
+        if (shoppingItemRepository.existsByFridgeIdAndProductIdAndIsDeletedFalseAndIsPurchasedFalse(
+                targetFridgeId,
                 request.productId()
         )) {
             throw new DuplicateShoppingItemException();
         }
 
-        Long fridgeId = fridgeService.findOrCreateFridgeId(member);
 
         ShoppingItem shoppingItem = ShoppingItem.create(
                 member.getId(),
-                fridgeId,
+                targetFridgeId,
                 request.productId(),
                 request.quantity()
         );
 
-        return ShoppingItemResponse.from(shoppingItemRepository.save(shoppingItem));
+        ShoppingItem savedShoppingItem = shoppingItemRepository.save(shoppingItem);
+        saveShoppingHistory(savedShoppingItem, member.getId(), ShoppingItemHistoryAction.CREATED, product.getName());
+
+        return ShoppingItemResponse.from(savedShoppingItem);
     }
 
     //장보기 조회
     public List<ShoppingItemListResponse> findShoppingItems(String email) {
+        return findShoppingItems(email, null);
+    }
+
+    public List<ShoppingItemListResponse> findShoppingItems(String email, Long fridgeId) {
         Member member = findMemberByEmail(email);
+        Long targetFridgeId = resolveFridgeId(member, fridgeId);
 
 
-        List<ShoppingItem> shoppingItems = shoppingItemRepository.findByMemberIdAndIsDeletedFalse(
-                member.getId());
+        List<ShoppingItem> shoppingItems = shoppingItemRepository.findByFridgeIdAndIsDeletedFalse(targetFridgeId);
 
         return toListResponse(shoppingItems);
     }
@@ -133,12 +180,19 @@ public class ShoppingItemService {
     //장바구니 삭제
     @Transactional
     public void deleteShoppingItem(String email, @Valid Long shoppingItemId) {
-        Member member = findMemberByEmail(email);
+        deleteShoppingItem(email, shoppingItemId, null);
+    }
 
-        ShoppingItem shoppingItem = findOwnedShoppingItem(shoppingItemId, member.getId());
+    @Transactional
+    public void deleteShoppingItem(String email, @Valid Long shoppingItemId, Long fridgeId) {
+        Member member = findMemberByEmail(email);
+        Long targetFridgeId = resolveFridgeId(member, fridgeId);
+
+        ShoppingItem shoppingItem = findAccessibleShoppingItem(shoppingItemId, targetFridgeId);
+        String productName = findProduct(shoppingItem.getProductId()).getName();
 
         shoppingItem.delete();
-
+        saveShoppingHistory(shoppingItem, member.getId(), ShoppingItemHistoryAction.DELETED, productName);
 
     }
 
@@ -149,11 +203,27 @@ public class ShoppingItemService {
             Long shoppingItemId,
             ShoppingItemCheckRequest request
     ) {
-        Member member = findMemberByEmail(email);
+        return updateShoppingItemPurchased(email, shoppingItemId, null, request);
+    }
 
-        ShoppingItem shoppingItem = findOwnedShoppingItem(shoppingItemId, member.getId());
+    @Transactional
+    public ShoppingItemResponse updateShoppingItemPurchased(
+            String email,
+            Long shoppingItemId,
+            Long fridgeId,
+            ShoppingItemCheckRequest request
+    ) {
+        Member member = findMemberByEmail(email);
+        Long targetFridgeId = resolveFridgeId(member, fridgeId);
+
+        ShoppingItem shoppingItem = findAccessibleShoppingItem(shoppingItemId, targetFridgeId);
+        String productName = findProduct(shoppingItem.getProductId()).getName();
 
         shoppingItem.updatePurchased(request.isPurchased());
+        ShoppingItemHistoryAction actionType = request.isPurchased()
+                ? ShoppingItemHistoryAction.CHECKED
+                : ShoppingItemHistoryAction.UNCHECKED;
+        saveShoppingHistory(shoppingItem, member.getId(), actionType, productName);
 
         return ShoppingItemResponse.from(shoppingItem);
     }
@@ -164,11 +234,24 @@ public class ShoppingItemService {
             Long shoppingItemId,
             ShoppingItemUpdateRequest request
     ) {
-        Member member = findMemberByEmail(email);
+        return updateShoppingItem(email, shoppingItemId, null, request);
+    }
 
-        ShoppingItem shoppingItem = findOwnedShoppingItem(shoppingItemId, member.getId());
+    @Transactional
+    public ShoppingItemResponse updateShoppingItem(
+            String email,
+            Long shoppingItemId,
+            Long fridgeId,
+            ShoppingItemUpdateRequest request
+    ) {
+        Member member = findMemberByEmail(email);
+        Long targetFridgeId = resolveFridgeId(member, fridgeId);
+
+        ShoppingItem shoppingItem = findAccessibleShoppingItem(shoppingItemId, targetFridgeId);
+        String productName = findProduct(shoppingItem.getProductId()).getName();
 
         shoppingItem.updateQuantity(request.quantity());
+        saveShoppingHistory(shoppingItem, member.getId(), ShoppingItemHistoryAction.UPDATED, productName);
 
         return ShoppingItemResponse.from(shoppingItem);
     }
@@ -180,13 +263,22 @@ public class ShoppingItemService {
             Long shoppingItemId,
             ShoppingItemMoveToFridgeRequest request
     ) {
+        return moveShoppingItemToFridge(email, shoppingItemId, null, request);
+    }
+
+    @Transactional
+    public FridgeItemResponse moveShoppingItemToFridge(
+            String email,
+            Long shoppingItemId,
+            Long fridgeId,
+            ShoppingItemMoveToFridgeRequest request
+    ) {
         Member member = findMemberByEmail(email);
+        Long targetFridgeId = resolveFridgeId(member, fridgeId);
 
-        ShoppingItem shoppingItem = findOwnedShoppingItem(shoppingItemId, member.getId());
+        ShoppingItem shoppingItem = findAccessibleShoppingItem(shoppingItemId, targetFridgeId);
 
-        Product product = productRepository
-                .findById(shoppingItem.getProductId())
-                .orElseThrow(() -> new ProductNotFoundException(shoppingItem.getProductId()));
+        Product product = findProduct(shoppingItem.getProductId());
 
         // 프론트에서 별도 유통기한을 보내지 않으면 사전 재료의 기본 유통기한을 사용
         LocalDate expiryDate = request == null ? null : request.expiryDate();
@@ -196,11 +288,10 @@ public class ShoppingItemService {
             expiryDate = LocalDate.now().plusDays(product.getDefaultExpiryDays());
         }
 
-        Long fridgeId = fridgeService.findOrCreateFridgeId(member);
 
         FridgeItem fridgeItem = FridgeItem.create(
-                fridgeId,
                 member.getId(),
+                targetFridgeId,
                 shoppingItem.getProductId(),
                 shoppingItem.getQuantity(),
                 expiryDate,
@@ -209,6 +300,15 @@ public class ShoppingItemService {
 
         FridgeItem savedFridgeItem = fridgeItemRepository.save(fridgeItem);
         shoppingItem.delete();
+        fridgeItemHistoryRepository.save(
+                FridgeItemHistory.create(
+                        savedFridgeItem,
+                        member.getId(),
+                        FridgeItemHistoryAction.CREATED,
+                        product.getName()
+                )
+        );
+        saveShoppingHistory(shoppingItem, member.getId(), ShoppingItemHistoryAction.MOVED_TO_FRIDGE, product.getName());
 
         return FridgeItemResponse.from(savedFridgeItem);
     }
