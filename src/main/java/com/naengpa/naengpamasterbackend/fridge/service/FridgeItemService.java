@@ -1,6 +1,7 @@
 package com.naengpa.naengpamasterbackend.fridge.service;
 
 import com.naengpa.naengpamasterbackend.fridge.dto.request.FridgeItemCreateRequest;
+import com.naengpa.naengpamasterbackend.fridge.dto.request.FridgeItemShareRequestAcceptRequest;
 import com.naengpa.naengpamasterbackend.fridge.dto.request.FridgeItemShareRequestCreateRequest;
 import com.naengpa.naengpamasterbackend.fridge.dto.request.FridgeItemTransferRequest;
 import com.naengpa.naengpamasterbackend.fridge.dto.request.FridgeItemUpdateRequest;
@@ -13,6 +14,7 @@ import com.naengpa.naengpamasterbackend.fridge.entity.FridgeItem;
 import com.naengpa.naengpamasterbackend.fridge.entity.FridgeItemHistory;
 import com.naengpa.naengpamasterbackend.fridge.entity.FridgeItemHistoryAction;
 import com.naengpa.naengpamasterbackend.fridge.entity.FridgeItemShareRequest;
+import com.naengpa.naengpamasterbackend.fridge.entity.FridgeItemShareRequestStatus;
 import com.naengpa.naengpamasterbackend.fridge.repository.FridgeItemShareRequestRepository;
 import com.naengpa.naengpamasterbackend.fridge.repository.FridgeItemHistoryRepository;
 import com.naengpa.naengpamasterbackend.fridge.repository.FridgeItemRepository;
@@ -110,10 +112,12 @@ public class FridgeItemService {
     }
 
     //냉장고 재료 목록 조회
+    @Transactional(readOnly = true)
     public List<FridgeItemListResponse> findFridgeItem(String email) {
         return findFridgeItem(email, null);
     }
 
+    @Transactional(readOnly = true)
     public List<FridgeItemListResponse> findFridgeItem(String email, Long fridgeId) {
         Member member = findMemberByEmail(email);
         Fridge fridge = resolveFridge(member, fridgeId);
@@ -126,10 +130,12 @@ public class FridgeItemService {
 
 
     //냉장고 카테고리별 조회
+    @Transactional(readOnly = true)
     public List<FridgeItemListResponse> findFridgeItemsByCategory(String email, Long categoryId) {
         return findFridgeItemsByCategory(email, categoryId, null);
     }
 
+    @Transactional(readOnly = true)
     public List<FridgeItemListResponse> findFridgeItemsByCategory(String email, Long categoryId, Long fridgeId) {
         Member member = findMemberByEmail(email);
         Fridge fridge = resolveFridge(member, fridgeId);
@@ -150,8 +156,13 @@ public class FridgeItemService {
 
     //
     private List<FridgeItemListResponse> toListResponse(List<FridgeItem> fridgeItems) {
+        if (fridgeItems.isEmpty()) {
+            return List.of();
+        }
+
         List<Long> productIds = fridgeItems.stream()
                 .map(FridgeItem::getProductId)
+                .distinct()
                 .toList();
 
         List<Product> products = productRepository.findByProductIdIn(productIds);
@@ -355,6 +366,72 @@ public class FridgeItemService {
         );
 
         return FridgeItemShareRequestResponse.of(savedRequest, product.getName());
+    }
+
+    @Transactional
+    public FridgeItemResponse acceptShareRequest(
+            String email,
+            Long shareRequestId,
+            FridgeItemShareRequestAcceptRequest request
+    ) {
+        Member requestedMember = findMemberByEmail(email);
+        FridgeItemShareRequest shareRequest = fridgeItemShareRequestRepository
+                .findByFridgeItemShareRequestIdAndRequestedMemberIdAndStatus(
+                        shareRequestId,
+                        requestedMember.getId(),
+                        FridgeItemShareRequestStatus.PENDING
+                )
+                .orElseThrow(() -> new AccessDeniedException("수락할 식재료 요청을 찾을 수 없습니다."));
+
+        Fridge sourceFridge = fridgeService.getAccessibleFridge(shareRequest.getSourceFridgeId(), requestedMember.getId());
+        Fridge targetFridge = fridgeService.getAccessibleFridge(shareRequest.getTargetFridgeId(), requestedMember.getId());
+        FridgeItem sourceItem = findAccessibleFridgeItem(shareRequest.getFridgeItemId(), sourceFridge.getFridgeId());
+        Product product = productRepository.findById(sourceItem.getProductId())
+                .orElseThrow(() -> new ProductNotFoundException(sourceItem.getProductId()));
+
+        boolean transferAll = Boolean.TRUE.equals(request.transferAll());
+        String remainingQuantity = request.remainingQuantity() == null ? null : request.remainingQuantity().trim();
+        if (transferAll) {
+            sourceItem.useAll();
+            saveHistory(sourceItem, requestedMember.getId(), FridgeItemHistoryAction.USED_ALL, product.getName());
+        } else {
+            if (remainingQuantity == null || remainingQuantity.isBlank()) {
+                throw new IllegalArgumentException("일부만 전달할 때는 내 냉장고에 남길 수량을 입력해주세요.");
+            }
+            sourceItem.usePartial(remainingQuantity);
+            saveHistory(sourceItem, requestedMember.getId(), FridgeItemHistoryAction.USED_PARTIAL, product.getName());
+        }
+
+        FridgeItem targetItem = FridgeItem.create(
+                requestedMember.getId(),
+                targetFridge.getFridgeId(),
+                sourceItem.getProductId(),
+                shareRequest.getRequestedQuantity(),
+                sourceItem.getExpiryDate(),
+                request.memo() == null || request.memo().isBlank() ? "식재료 요청 수락" : request.memo().trim()
+        );
+        FridgeItem savedTargetItem = fridgeItemRepository.save(targetItem);
+        saveHistory(savedTargetItem, requestedMember.getId(), FridgeItemHistoryAction.CREATED, product.getName());
+
+        shareRequest.accept();
+        return FridgeItemResponse.from(savedTargetItem);
+    }
+
+    @Transactional
+    public FridgeItemShareRequestResponse rejectShareRequest(String email, Long shareRequestId) {
+        Member requestedMember = findMemberByEmail(email);
+        FridgeItemShareRequest shareRequest = fridgeItemShareRequestRepository
+                .findByFridgeItemShareRequestIdAndRequestedMemberIdAndStatus(
+                        shareRequestId,
+                        requestedMember.getId(),
+                        FridgeItemShareRequestStatus.PENDING
+                )
+                .orElseThrow(() -> new AccessDeniedException("거절할 식재료 요청을 찾을 수 없습니다."));
+        Product product = productRepository.findById(shareRequest.getProductId())
+                .orElseThrow(() -> new ProductNotFoundException(shareRequest.getProductId()));
+
+        shareRequest.reject();
+        return FridgeItemShareRequestResponse.of(shareRequest, product.getName());
     }
 
     //유통기한 임박 재료 조회

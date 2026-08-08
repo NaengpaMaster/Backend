@@ -64,6 +64,11 @@ public class FridgeInvite {
         respondedAt = LocalDateTime.now();
     }
 
+    public void expire() {
+        status = FridgeInviteStatus.EXPIRED;
+        respondedAt = LocalDateTime.now();
+    }
+
     @PrePersist
     void prePersist() {
         createdAt = LocalDateTime.now();

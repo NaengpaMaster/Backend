@@ -87,4 +87,14 @@ public class FridgeItemShareRequest {
     void prePersist() {
         requestedAt = LocalDateTime.now();
     }
+
+    public void accept() {
+        status = FridgeItemShareRequestStatus.ACCEPTED;
+        respondedAt = LocalDateTime.now();
+    }
+
+    public void reject() {
+        status = FridgeItemShareRequestStatus.REJECTED;
+        respondedAt = LocalDateTime.now();
+    }
 }

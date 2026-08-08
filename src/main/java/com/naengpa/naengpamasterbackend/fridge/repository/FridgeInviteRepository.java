@@ -20,4 +20,10 @@ public interface FridgeInviteRepository extends JpaRepository<FridgeInvite, Long
             Long inviteeMemberId,
             FridgeInviteStatus status
     );
+
+    Optional<FridgeInvite> findByFridgeInviteIdAndFridgeIdAndStatus(
+            Long fridgeInviteId,
+            Long fridgeId,
+            FridgeInviteStatus status
+    );
 }
