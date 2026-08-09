@@ -37,3 +37,10 @@ jwt:
 agent:
   enabled: ${AGENT_ENABLED:false}
   base-url: ${AGENT_BASE_URL:http://localhost:8000}
+
+aws:
+  s3:
+    access-key-id: ${AWS_ACCESS_KEY_ID}
+    secret-access-key: ${AWS_SECRET_ACCESS_KEY}
+    region: ${AWS_REGION}
+    bucket: ${AWS_S3_BUCKET}
