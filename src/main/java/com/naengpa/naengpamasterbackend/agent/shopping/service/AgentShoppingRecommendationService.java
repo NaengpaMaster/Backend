@@ -9,8 +9,10 @@ import com.naengpa.naengpamasterbackend.agent.shopping.dto.request.ShoppingRecom
 import com.naengpa.naengpamasterbackend.agent.shopping.dto.response.ShoppingRecommendationItemResponse;
 import com.naengpa.naengpamasterbackend.agent.shopping.dto.response.ShoppingRecommendationResponse;
 import com.naengpa.naengpamasterbackend.agent.usage.service.LlmUsageLogService;
+import com.naengpa.naengpamasterbackend.fridge.entity.Fridge;
 import com.naengpa.naengpamasterbackend.fridge.entity.FridgeItem;
 import com.naengpa.naengpamasterbackend.fridge.repository.FridgeItemRepository;
+import com.naengpa.naengpamasterbackend.fridge.service.FridgeService;
 import com.naengpa.naengpamasterbackend.member.entity.Member;
 import com.naengpa.naengpamasterbackend.member.repository.MemberExcludedProductRepository;
 import com.naengpa.naengpamasterbackend.member.repository.MemberFavoriteFoodRepository;
@@ -40,6 +42,7 @@ public class AgentShoppingRecommendationService {
     private final ConversationCommandService conversationCommandService;
     private final LlmUsageLogService llmUsageLogService;
     private final AgentShoppingRecommendationClient agentShoppingRecommendationClient;
+    private final FridgeService fridgeService;
     private final boolean agentEnabled;
 
     public AgentShoppingRecommendationService(
@@ -52,6 +55,7 @@ public class AgentShoppingRecommendationService {
             ConversationCommandService conversationCommandService,
             LlmUsageLogService llmUsageLogService,
             AgentShoppingRecommendationClient agentShoppingRecommendationClient,
+            FridgeService fridgeService,
             @Value("${agent.enabled}") boolean agentEnabled
     ) {
         this.fridgeItemRepository = fridgeItemRepository;
@@ -63,6 +67,7 @@ public class AgentShoppingRecommendationService {
         this.conversationCommandService = conversationCommandService;
         this.llmUsageLogService = llmUsageLogService;
         this.agentShoppingRecommendationClient = agentShoppingRecommendationClient;
+        this.fridgeService = fridgeService;
         this.agentEnabled = agentEnabled;
     }
 
@@ -72,13 +77,16 @@ public class AgentShoppingRecommendationService {
     ) {
         Member member = memberRepository.findByEmail(email)
                 .orElseThrow(() -> new BadCredentialsException("회원을 찾을 수 없습니다."));
+        Fridge targetFridge = resolveTargetFridge(member, request.fridgeId());
+        Member preferenceMember = memberRepository.findById(targetFridge.getOwnerMemberId())
+                .orElseThrow(() -> new BadCredentialsException("추천 기준 회원을 찾을 수 없습니다."));
 
         try {
             List<FridgeItem> fridgeItems =
-                    fridgeItemRepository.findByMemberIdAndIsDeletedFalse(member.getId());
+                    fridgeItemRepository.findByFridgeIdAndIsDeletedFalse(targetFridge.getFridgeId());
 
             List<ShoppingItem> shoppingItems =
-                    shoppingItemRepository.findByMemberIdAndIsDeletedFalse(member.getId());
+                    shoppingItemRepository.findByFridgeIdAndIsDeletedFalse(targetFridge.getFridgeId());
 
             // 이미 냉장고에 있거나 장보기 예정인 재료, 회원이 못 먹는 재료는 추천 후보에서 제외
             Set<Long> excludedProductIds = new HashSet<>();
@@ -93,7 +101,7 @@ public class AgentShoppingRecommendationService {
                     .forEach(excludedProductIds::add);
 
             // 못 먹는 재료는 백엔드에서 먼저 제거해 Agent가 실수로 추천하지 못하게 함
-            memberExcludedProductRepository.findAllByMemberWithProduct(member).stream()
+            memberExcludedProductRepository.findAllByMemberWithProduct(preferenceMember).stream()
                     .map(memberExcludedProduct -> memberExcludedProduct.getProduct().getProductId())
                     .forEach(excludedProductIds::add);
 
@@ -101,7 +109,7 @@ public class AgentShoppingRecommendationService {
             excludedProductIds.addAll(request.excludeProductIds());
 
             // 선호 음식은 Product 카테고리와 직접 매핑하지 않고, Agent의 추천 판단 기준으로 전달
-            List<String> favoriteFoods = memberFavoriteFoodRepository.findAllByMemberOrderByIdAsc(member).stream()
+            List<String> favoriteFoods = memberFavoriteFoodRepository.findAllByMemberOrderByIdAsc(preferenceMember).stream()
                     .map(memberFavoriteFood -> memberFavoriteFood.getFoodCategory().getName())
                     .toList();
 
@@ -134,6 +142,13 @@ public class AgentShoppingRecommendationService {
             llmUsageLogService.saveRuleBasedFailureLog(member.getId(), exception.getMessage());
             throw exception;
         }
+    }
+
+    private Fridge resolveTargetFridge(Member member, Long fridgeId) {
+        if (fridgeId == null) {
+            return fridgeService.getMyActiveFridge(member);
+        }
+        return fridgeService.getAccessibleFridge(fridgeId, member.getId());
     }
 
     private int normalizeLimit(Integer requestLimit) {

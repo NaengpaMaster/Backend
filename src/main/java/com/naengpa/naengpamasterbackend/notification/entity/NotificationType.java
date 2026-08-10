@@ -13,6 +13,9 @@ public enum NotificationType {
     // 댓글에 답글이 등록된 알림
     COMMENT_REPLIED,
 
+    // 가족 냉장고 식재료 요청 알림
+    FRIDGE_ITEM_REQUESTED,
+
     // 특정 도메인에 묶이지 않는 일반 알림
     GENERAL
 }
