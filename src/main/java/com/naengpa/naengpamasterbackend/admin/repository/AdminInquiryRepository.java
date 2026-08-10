@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 @Repository
@@ -17,6 +18,15 @@ public interface AdminInquiryRepository extends JpaRepository<Inquiry, Long> {
 
     @Query("SELECT COUNT(i) FROM Inquiry i WHERE i.isAnswered = false AND i.isDeleted = false")
     Long countPendingInquiries();
+
+    @Query("""
+            SELECT COUNT(i)
+            FROM Inquiry i
+            WHERE i.isAnswered = false
+              AND i.isDeleted = false
+              AND i.createdAt < :cutoff
+            """)
+    Long countPendingInquiriesCreatedBefore(@Param("cutoff") LocalDateTime cutoff);
 
     @Query("""
             SELECT new com.naengpa.naengpamasterbackend.admin.dto.response.AdminInquiryDetailResponse(

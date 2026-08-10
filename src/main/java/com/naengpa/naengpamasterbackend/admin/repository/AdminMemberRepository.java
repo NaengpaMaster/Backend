@@ -122,6 +122,18 @@ public interface AdminMemberRepository extends JpaRepository<Member, Long> {
             @Param("endExclusive") LocalDateTime endExclusive
     );
 
+    @Query(value = """
+            SELECT COUNT(*)
+            FROM members
+            WHERE role = 'USER'
+              AND created_at >= :startAt
+              AND created_at < :endExclusive
+            """, nativeQuery = true)
+    long countNewMembers(
+            @Param("startAt") LocalDateTime startAt,
+            @Param("endExclusive") LocalDateTime endExclusive
+    );
+
     Optional<Member> findByEmail(String adminEmail);
 
     int countByRoleAndStatus(MemberRole memberRole, MemberStatus memberStatus);
