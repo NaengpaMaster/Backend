@@ -50,6 +50,27 @@ public class EmailVerificationService {
         sendMail(normalizedEmail, code);
     }
 
+
+    @Transactional
+    public void sendOAuth2VerificationCode(String email) {
+        String normalizedEmail = normalizeEmail(email);
+        memberRepository.findByEmail(normalizedEmail)
+                .ifPresent(member -> {
+                    if (member.isInactive()) {
+                        throw new WithdrawnEmailException();
+                    }
+                });
+
+        String code = generateCode();
+        EmailVerification emailVerification = EmailVerification.create(
+                normalizedEmail,
+                code,
+                LocalDateTime.now().plusMinutes(CODE_EXPIRE_MINUTES)
+        );
+        emailVerificationRepository.save(emailVerification);
+        sendMail(normalizedEmail, code);
+    }
+
     @Transactional
     public void confirmVerificationCode(String email, String code) {
         String normalizedEmail = normalizeEmail(email);

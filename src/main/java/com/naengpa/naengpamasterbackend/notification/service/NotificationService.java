@@ -80,6 +80,30 @@ public class NotificationService {
     }
 
     @Transactional
+    public void createFridgeItemRequestedNotification(
+            Long requestedMemberId,
+            Long shareRequestId,
+            String requesterName,
+            String productName,
+            String requestedQuantity,
+            String requestMessage
+    ) {
+        String content = requestMessage == null || requestMessage.isBlank()
+                ? requesterName + "님이 " + productName + " " + requestedQuantity + "을(를) 요청했어요."
+                : requesterName + "님: " + requestMessage;
+
+        notificationRepository.save(Notification.create(
+                requestedMemberId,
+                NotificationType.FRIDGE_ITEM_REQUESTED,
+                "식재료 요청 알림",
+                content,
+                NotificationTargetType.FRIDGE_ITEM_SHARE_REQUEST,
+                shareRequestId,
+                null
+        ));
+    }
+
+    @Transactional
     public void createExpiryNotifications(Long memberId) {
         LocalDate today = LocalDate.now();
         LocalDate threeDaysLater = today.plusDays(3);

@@ -121,7 +121,8 @@ class AgentShoppingRecommendationServiceTests {
 
         ShoppingRecommendationRequest request = new ShoppingRecommendationRequest(
                 20,
-                List.of(excludedProduct.getProductId())
+                List.of(excludedProduct.getProductId()),
+                null
         );
 
         // when
