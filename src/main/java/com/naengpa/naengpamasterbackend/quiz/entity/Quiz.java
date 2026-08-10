@@ -1,4 +1,4 @@
-package com.naengpa.naengpamasterbackend.quiz.entitiy;
+package com.naengpa.naengpamasterbackend.quiz.entity;
 
 import jakarta.persistence.*;
 import lombok.AccessLevel;
