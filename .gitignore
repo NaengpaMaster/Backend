@@ -43,4 +43,6 @@ out/
 src/main/resources/application-secret.env
 
 ### Personal docs ###
-docs/
+docs/*
+!docs/inquiry-knowledge/
+!docs/inquiry-knowledge/**
