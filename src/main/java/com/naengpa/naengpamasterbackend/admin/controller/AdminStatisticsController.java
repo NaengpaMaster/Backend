@@ -21,37 +21,48 @@ public class AdminStatisticsController {
 
     private final AdminStatisticsService adminStatisticsService;
 
-    // 냉파 점수 평균
-    @GetMapping("/score-average")
-    public ResponseEntity<ApiResponse<AdminScoreAverageResponse>> getScoreAverage() {
-
-        return ResponseEntity.ok(ApiResponse.success(adminStatisticsService.getScoreAverage()));
-    }
-
-    // 유통기한 만료 건수 조회
-    @GetMapping("/expired-count")
-    public ResponseEntity<ApiResponse<AdminExpiredCountResponse>> getExpiredCount() {
-        return ResponseEntity.ok(ApiResponse.success(adminStatisticsService.getExpiredCount()));
-    }
-
-    // 카테고리별 유통기한 만료 건수 조회
-    @GetMapping("/category")
-    public ResponseEntity<ApiResponse<List<AdminCategoryStatResponse>>> getExpiredCountByCategory(
-            @RequestParam(required = true) Integer period
+    // 전체 레시피 현황과 선택 기간 카테고리별 등록 현황 조회
+    @GetMapping("/recipes")
+    public ResponseEntity<ApiResponse<AdminRecipeStatisticsResponse>> getRecipeStatistics(
+            @RequestParam LocalDate startDate,
+            @RequestParam LocalDate endDate
     ) {
-        return ResponseEntity.ok(ApiResponse.success(adminStatisticsService.getExpiredCountByCategory(period)));
+        StatisticsPeriod period = StatisticsPeriod.of(startDate, endDate);
+
+        return ResponseEntity.ok(ApiResponse.success(adminStatisticsService.getRecipeStatistics(period)));
+    }
+
+    // 선택 기간 재료·냉파 상세 통계 조회
+    @GetMapping("/materials")
+    public ResponseEntity<ApiResponse<AdminMaterialStatisticsResponse>> getMaterialStatistics(
+            @RequestParam LocalDate startDate,
+            @RequestParam LocalDate endDate
+    ) {
+        StatisticsPeriod period = StatisticsPeriod.of(startDate, endDate);
+
+        return ResponseEntity.ok(ApiResponse.success(adminStatisticsService.getMaterialStatistics(period)));
+    }
+
+    // 선택 기간 통계 요약 조회
+    @GetMapping("/summary")
+    public ResponseEntity<ApiResponse<AdminStatisticsSummaryResponse>> getStatisticsSummary(
+            @RequestParam LocalDate startDate,
+            @RequestParam LocalDate endDate
+    ) {
+        StatisticsPeriod period = StatisticsPeriod.of(startDate, endDate);
+
+        return ResponseEntity.ok(ApiResponse.success(adminStatisticsService.getStatisticsSummary(period)));
     }
 
     // Top 5 유통기한 만료 건수 카테고리 조회
     @GetMapping("/top-ingredients")
-    public ResponseEntity<ApiResponse<List<AdminTopWastedIngredientResponse>>> getTop5Ingredients() {
-        return ResponseEntity.ok(ApiResponse.success(adminStatisticsService.getTop5Ingredients()));
-    }
+    public ResponseEntity<ApiResponse<List<AdminTopWastedIngredientResponse>>> getTop5Ingredients(
+            @RequestParam LocalDate startDate,
+            @RequestParam LocalDate endDate
+    ) {
+        StatisticsPeriod period = StatisticsPeriod.of(startDate, endDate);
 
-    // 주간 만료 추이 (날짜별 만료 건수)
-    @GetMapping("/weekly-trend")
-    public ResponseEntity<ApiResponse<AdminWeeklyTrendResponse>> getWeeklyExpiredTrend() {
-        return ResponseEntity.ok(ApiResponse.success(adminStatisticsService.getWeeklyExpiredTrend()));
+        return ResponseEntity.ok(ApiResponse.success(adminStatisticsService.getTop5Ingredients(period)));
     }
 
     // 회원 현황 api

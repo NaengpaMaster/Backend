@@ -1,11 +1,13 @@
 package com.naengpa.naengpamasterbackend.admin.dto.response;
 
+import com.naengpa.naengpamasterbackend.admin.statistics.StatisticsGranularity;
 import java.time.LocalDate;
 import java.util.List;
 
 public record AdminMemberStatisticsResponse(
         LocalDate startDate,
         LocalDate endDate,
+        StatisticsGranularity granularity,
         long activeMemberCount,
         long inactiveMemberCount,
         long newMemberCount,
@@ -21,6 +23,7 @@ public record AdminMemberStatisticsResponse(
     public static AdminMemberStatisticsResponse of(
             LocalDate startDate,
             LocalDate endDate,
+            StatisticsGranularity granularity,
             long activeMemberCount,
             long inactiveMemberCount,
             long newMemberCount,
@@ -30,6 +33,7 @@ public record AdminMemberStatisticsResponse(
         return new AdminMemberStatisticsResponse(
                 startDate,
                 endDate,
+                granularity,
                 activeMemberCount,
                 inactiveMemberCount,
                 newMemberCount,
