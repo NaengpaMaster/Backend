@@ -187,6 +187,22 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.fail(exception.getMessage()));
     }
 
+    @ExceptionHandler(InquiryChatSessionNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInquiryChatSessionNotFoundException(
+            InquiryChatSessionNotFoundException exception
+    ) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.fail(exception.getMessage()));
+    }
+
+    @ExceptionHandler(InquiryChatUnavailableException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInquiryChatUnavailableException(
+            InquiryChatUnavailableException exception
+    ) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(ApiResponse.fail(exception.getMessage()));
+    }
+
     @ExceptionHandler(InquiryAlreadyAnsweredException.class)
     public ResponseEntity<ApiResponse<Void>> handleInquiryAlreadyAnsweredException(InquiryAlreadyAnsweredException exception) {
         return ResponseEntity.status(HttpStatus.CONFLICT)

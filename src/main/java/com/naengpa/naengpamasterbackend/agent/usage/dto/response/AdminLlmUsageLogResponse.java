@@ -1,6 +1,7 @@
 package com.naengpa.naengpamasterbackend.agent.usage.dto.response;
 
 import com.naengpa.naengpamasterbackend.agent.usage.entity.LlmCallStatus;
+import com.naengpa.naengpamasterbackend.agent.usage.entity.LlmFeatureType;
 import com.naengpa.naengpamasterbackend.agent.usage.entity.LlmUsageLog;
 import com.naengpa.naengpamasterbackend.member.entity.Member;
 
@@ -12,6 +13,7 @@ public record AdminLlmUsageLogResponse(
         Long memberId,
         String email,
         String nickname,
+        LlmFeatureType featureType,
         String modelName,
         Integer promptTokens,
         Integer completionTokens,
@@ -28,6 +30,7 @@ public record AdminLlmUsageLogResponse(
                 llmUsageLog.getMemberId(),
                 member == null ? null : member.getEmail(),
                 member == null ? null : member.getNickname(),
+                llmUsageLog.getFeatureType(),
                 llmUsageLog.getModelName(),
                 llmUsageLog.getPromptTokens(),
                 llmUsageLog.getCompletionTokens(),
