@@ -41,7 +41,8 @@ class FridgeItemAuthorizationTests {
             productRepository,
             fridgeService,
             mock(com.naengpa.naengpamasterbackend.fridge.repository.FridgeItemShareRequestRepository.class),
-            mock(com.naengpa.naengpamasterbackend.notification.service.NotificationService.class)
+            mock(com.naengpa.naengpamasterbackend.notification.service.NotificationService.class),
+            mock(com.naengpa.naengpamasterbackend.fridge.report.service.ConsumedProductService.class)
     );
 
     @Test
