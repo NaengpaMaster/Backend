@@ -56,6 +56,9 @@ dependencies {
     // Actuator: 서버 상태 확인용
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
 
+    // AWS S3: 영수증 이미지 임시 저장
+    implementation 'software.amazon.awssdk:s3:2.30.31'
+
     // Swagger/OpenAPI
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.3'
 

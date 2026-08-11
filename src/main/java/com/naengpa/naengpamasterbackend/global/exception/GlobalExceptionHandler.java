@@ -13,6 +13,7 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 
 import jakarta.validation.ConstraintViolationException;
 
@@ -36,6 +37,14 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleConstraintViolationException(ConstraintViolationException exception) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.fail("입력값 검증에 실패했습니다."));
+    }
+
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMissingServletRequestPartException(
+            MissingServletRequestPartException exception
+    ) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.fail("업로드할 파일을 선택해주세요."));
     }
 
     @ExceptionHandler(PasswordMismatchException.class)
@@ -163,6 +172,18 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.fail(exception.getMessage()));
     }
 
+    @ExceptionHandler(InvalidReceiptImageException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvalidReceiptImageException(InvalidReceiptImageException exception) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.fail(exception.getMessage()));
+    }
+
+    @ExceptionHandler(ReceiptImageUploadException.class)
+    public ResponseEntity<ApiResponse<Void>> handleReceiptImageUploadException(ReceiptImageUploadException exception) {
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ApiResponse.fail(exception.getMessage()));
+    }
+
     @ExceptionHandler(InquiryNotFoundException.class)
     public ResponseEntity<ApiResponse<Void>> handleInquiryNotFoundException(InquiryNotFoundException exception) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
@@ -184,6 +205,22 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AiConversationSessionNotFoundException.class)
     public ResponseEntity<ApiResponse<Void>> handleAiConversationSessionNotFoundException(AiConversationSessionNotFoundException exception) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.fail(exception.getMessage()));
+    }
+
+    @ExceptionHandler(InquiryChatSessionNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInquiryChatSessionNotFoundException(
+            InquiryChatSessionNotFoundException exception
+    ) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.fail(exception.getMessage()));
+    }
+
+    @ExceptionHandler(InquiryChatUnavailableException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInquiryChatUnavailableException(
+            InquiryChatUnavailableException exception
+    ) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                 .body(ApiResponse.fail(exception.getMessage()));
     }
 
@@ -225,11 +262,12 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.fail(exception.getMessage()));
     }
-
+  
     @ExceptionHandler(QuizAlreadySolvedException.class)
     public ResponseEntity<ApiResponse<Void>> handleQuizAlreadySolvedException(QuizAlreadySolvedException exception)
     {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(ApiResponse.fail(exception.getMessage()));
     }
+
 }
