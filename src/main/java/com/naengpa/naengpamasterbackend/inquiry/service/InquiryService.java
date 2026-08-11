@@ -26,7 +26,7 @@ public class InquiryService {
     private final InquiryAnswerRepository inquiryAnswerRepository;
     private final MemberRepository memberRepository;
 
-    // 목록 조회
+    // 로그인한 회원이 작성한 문의 목록을 조회합니다.
     @Transactional(readOnly = true)
     public Page<InquiryResponse> getInquiries(String email, Pageable pageable) {
 
@@ -36,7 +36,7 @@ public class InquiryService {
                 .map(InquiryResponse::from);
     }
 
-    // 상세 조회
+    // 로그인한 회원이 소유한 문의와 답변을 조회합니다.
     @Transactional(readOnly = true)
     public InquiryDetailResponse getInquiryDetail(Long inquiryId, String email) {
         Long memberId = resolveMemberId(email);
@@ -51,7 +51,7 @@ public class InquiryService {
         return InquiryDetailResponse.from(inquiry ,inquiryAnswer);
     }
 
-    // 등록
+    // 로그인한 회원의 새 문의를 등록합니다.
     @Transactional
     public void createInquiry(InquiryRequest request, String email) {
         Long memberId = resolveMemberId(email);
@@ -59,7 +59,7 @@ public class InquiryService {
         inquiryRepository.save(inquiry);
     }
 
-    // 수정
+    // 답변 전인 본인 문의의 제목과 내용을 수정합니다.
     @Transactional
     public void updateInquiry(Long inquiryId, InquiryRequest request, String email) {
         Long memberId = resolveMemberId(email);
@@ -72,7 +72,7 @@ public class InquiryService {
         inquiry.update(request);
     }
 
-    // 삭제
+    // 답변 전인 본인 문의를 삭제 처리합니다.
     @Transactional
     public void deleteInquiry(Long inquiryId, String email) {
         Long memberId = resolveMemberId(email);
@@ -85,15 +85,16 @@ public class InquiryService {
         inquiry.delete();
     }
 
+    // 답변이 완료된 문의의 수정·삭제 요청을 차단합니다.
     private void validateNotAnswered(Inquiry inquiry) {
         if (inquiry.getIsAnswered()) {
             throw new InquiryAlreadyAnsweredException();
         }
     }
+    // 인증 이메일에 해당하는 회원 ID를 조회합니다.
     private Long resolveMemberId(String email) {
         return memberRepository.findByEmail(email)
                 .map(Member::getId)
                 .orElseThrow(MemberNotFoundException::new);
     }
 }
-

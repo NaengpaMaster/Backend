@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
 @Repository
 public interface AdminScoreRepository extends JpaRepository<Score, Long> {
 
-    // 냉파 점수 평균 조회
+    // 선택 기간에 점수가 갱신된 활성 USER의 평균 냉파 점수와 회원 수를 조회합니다.
     @Query(value = """
             SELECT COALESCE(AVG(s.score), 0) AS "averageScore",
                    COUNT(*) AS "memberCount"
