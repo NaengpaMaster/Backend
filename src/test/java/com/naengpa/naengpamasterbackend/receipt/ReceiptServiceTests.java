@@ -4,18 +4,28 @@ import com.naengpa.naengpamasterbackend.global.exception.InvalidReceiptImageExce
 import com.naengpa.naengpamasterbackend.global.s3.S3Uploader;
 import com.naengpa.naengpamasterbackend.member.entity.Member;
 import com.naengpa.naengpamasterbackend.member.repository.MemberRepository;
+import com.naengpa.naengpamasterbackend.product.entity.Product;
+import com.naengpa.naengpamasterbackend.product.repository.ProductRepository;
+import com.naengpa.naengpamasterbackend.receipt.dto.request.ReceiptOcrItemRequest;
+import com.naengpa.naengpamasterbackend.receipt.dto.request.ReceiptOcrSaveRequest;
+import com.naengpa.naengpamasterbackend.receipt.dto.response.ReceiptAnalysisItemResponse;
 import com.naengpa.naengpamasterbackend.receipt.dto.response.ReceiptImageUploadResponse;
 import com.naengpa.naengpamasterbackend.receipt.entity.ReceiptAnalysis;
+import com.naengpa.naengpamasterbackend.receipt.entity.ReceiptAnalysisItem;
 import com.naengpa.naengpamasterbackend.receipt.entity.ReceiptAnalysisStatus;
+import com.naengpa.naengpamasterbackend.receipt.repository.ReceiptAnalysisItemRepository;
 import com.naengpa.naengpamasterbackend.receipt.repository.ReceiptAnalysisRepository;
 import com.naengpa.naengpamasterbackend.receipt.service.ReceiptService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -31,6 +41,8 @@ class ReceiptServiceTests {
 
     private MemberRepository memberRepository;
     private ReceiptAnalysisRepository receiptAnalysisRepository;
+    private ReceiptAnalysisItemRepository receiptAnalysisItemRepository;
+    private ProductRepository productRepository;
     private S3Uploader s3Uploader;
     private ReceiptService receiptService;
 
@@ -38,8 +50,16 @@ class ReceiptServiceTests {
     void setUp() {
         memberRepository = mock(MemberRepository.class);
         receiptAnalysisRepository = mock(ReceiptAnalysisRepository.class);
+        receiptAnalysisItemRepository = mock(ReceiptAnalysisItemRepository.class);
+        productRepository = mock(ProductRepository.class);
         s3Uploader = mock(S3Uploader.class);
-        receiptService = new ReceiptService(memberRepository, receiptAnalysisRepository, s3Uploader);
+        receiptService = new ReceiptService(
+                memberRepository,
+                receiptAnalysisRepository,
+                s3Uploader,
+                receiptAnalysisItemRepository,
+                productRepository
+        );
     }
 
     @Test
@@ -141,5 +161,65 @@ class ReceiptServiceTests {
 
         verify(s3Uploader, never()).upload(any(MultipartFile.class), anyString());
         verify(receiptAnalysisRepository, never()).save(any(ReceiptAnalysis.class));
+    }
+
+    @Test
+    @DisplayName("OCR 결과 저장 시 사전 재료와 매칭된 후보만 PENDING 상태로 저장한다")
+    void saveOcrResult_savesOnlyMatchedItems() {
+        Member member = Member.createUser("user@test.com", "encoded", "사용자", null);
+        ReflectionTestUtils.setField(member, "id", 7L);
+
+        ReceiptAnalysis receiptAnalysis = ReceiptAnalysis.createPending(
+                7L,
+                "receipt.jpeg",
+                "receipts/7/test.jpeg"
+        );
+        ReflectionTestUtils.setField(receiptAnalysis, "receiptAnalysisId", 1L);
+
+        Product mushroom = Product.create(1L, "팽이버섯", 3);
+        ReflectionTestUtils.setField(mushroom, "productId", 10L);
+
+        Product tofu = Product.create(1L, "두부", 5);
+        ReflectionTestUtils.setField(tofu, "productId", 20L);
+
+        ReceiptOcrSaveRequest request = new ReceiptOcrSaveRequest(
+                "007 국산 팽이버섯 200g 1 1000",
+                List.of(
+                        new ReceiptOcrItemRequest("국산 팽이버섯 200g", "1개"),
+                        new ReceiptOcrItemRequest("강릉최가두부 550g", "2개"),
+                        new ReceiptOcrItemRequest("유상봉투", "1개")
+                )
+        );
+
+        when(memberRepository.findByEmail("user@test.com")).thenReturn(Optional.of(member));
+        when(receiptAnalysisRepository.findByReceiptAnalysisIdAndMemberId(1L, 7L))
+                .thenReturn(Optional.of(receiptAnalysis));
+        when(productRepository.findByNameAndIsActiveTrue("팽이버섯"))
+                .thenReturn(Optional.of(mushroom));
+        when(productRepository.findByNameAndIsActiveTrue("강릉최가두부"))
+                .thenReturn(Optional.empty());
+        when(productRepository.findByNameAndIsActiveTrue("유상봉투"))
+                .thenReturn(Optional.empty());
+        when(productRepository.findByIsActiveTrue())
+                .thenReturn(List.of(mushroom, tofu));
+
+        List<ReceiptAnalysisItemResponse> response = receiptService.saveOcrResult(
+                "user@test.com",
+                1L,
+                request
+        );
+
+        assertThat(receiptAnalysis.getRawOcrText()).isEqualTo("007 국산 팽이버섯 200g 1 1000");
+        assertThat(response)
+                .extracting(ReceiptAnalysisItemResponse::matchedProductName)
+                .containsExactly("팽이버섯", "두부");
+        assertThat(response)
+                .extracting(ReceiptAnalysisItemResponse::expiryDate)
+                .containsExactly(LocalDate.now().plusDays(3), LocalDate.now().plusDays(5));
+
+        // 매칭 실패한 유상봉투는 저장 후보에서 제외되는지 확인
+        ArgumentCaptor<List<ReceiptAnalysisItem>> captor = ArgumentCaptor.forClass(List.class);
+        verify(receiptAnalysisItemRepository).saveAll(captor.capture());
+        assertThat(captor.getValue()).hasSize(2);
     }
 }
