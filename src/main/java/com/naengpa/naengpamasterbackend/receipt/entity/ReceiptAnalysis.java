@@ -74,4 +74,9 @@ public class ReceiptAnalysis {
     void prePersist() {
         createdAt = LocalDateTime.now();
     }
+
+    public void updateRawOcrText(String rawOcrText) {
+        this.rawOcrText = rawOcrText;
+        this.updatedAt = LocalDateTime.now();
+    }
 }
