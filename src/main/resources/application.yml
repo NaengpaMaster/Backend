@@ -71,6 +71,7 @@ jwt:
 agent:
   enabled: ${AGENT_ENABLED:false}
   base-url: ${AGENT_BASE_URL:http://localhost:8000}
+  api-key: ${AGENT_API_KEY}
 
 oauth2:
   frontend-redirect-url: ${OAUTH2_FRONTEND_REDIRECT_URL:http://localhost:3000}

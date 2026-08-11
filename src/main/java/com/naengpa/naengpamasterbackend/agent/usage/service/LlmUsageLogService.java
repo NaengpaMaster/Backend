@@ -2,12 +2,14 @@ package com.naengpa.naengpamasterbackend.agent.usage.service;
 
 import com.naengpa.naengpamasterbackend.agent.usage.dto.response.LlmUsageLogResponse;
 import com.naengpa.naengpamasterbackend.agent.usage.entity.LlmUsageLog;
+import com.naengpa.naengpamasterbackend.agent.usage.entity.LlmFeatureType;
 import com.naengpa.naengpamasterbackend.agent.usage.repository.LlmUsageLogRepository;
 import com.naengpa.naengpamasterbackend.member.entity.Member;
 import com.naengpa.naengpamasterbackend.member.repository.MemberRepository;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -51,6 +53,7 @@ public class LlmUsageLogService {
         // 현재 추천 MVP는 실제 LLM 호출 전 단계라 토큰 수와 비용을 0으로 기록
         llmUsageLogRepository.save(LlmUsageLog.success(
                 memberId,
+                LlmFeatureType.SHOPPING_RECOMMENDATION,
                 RULE_BASED_MVP_MODEL,
                 0,
                 0,
@@ -73,6 +76,7 @@ public class LlmUsageLogService {
         // FastAPI Agent가 반환한 실제 LLM 사용량을 저장하고, 비용이 없으면 백엔드 단가 기준으로 계산
         llmUsageLogRepository.save(LlmUsageLog.success(
                 memberId,
+                LlmFeatureType.SHOPPING_RECOMMENDATION,
                 modelName,
                 promptTokens,
                 completionTokens,
@@ -86,6 +90,7 @@ public class LlmUsageLogService {
         // 추천 처리 중 예외가 발생하면 실패 이력을 남김
         llmUsageLogRepository.save(LlmUsageLog.failed(
                 memberId,
+                LlmFeatureType.SHOPPING_RECOMMENDATION,
                 RULE_BASED_MVP_MODEL,
                 truncateFailureMessage(failureMessage)
         ));
@@ -96,6 +101,37 @@ public class LlmUsageLogService {
         // Agent 서버나 LLM 호출 실패도 사용량 이력에 남겨 장애 추적이 가능하게 함
         llmUsageLogRepository.save(LlmUsageLog.failed(
                 memberId,
+                LlmFeatureType.SHOPPING_RECOMMENDATION,
+                modelName,
+                truncateFailureMessage(failureMessage)
+        ));
+    }
+
+    @Transactional
+    public void saveInquirySuccessLog(
+            Long memberId,
+            String modelName,
+            Integer promptTokens,
+            Integer completionTokens,
+            Integer totalTokens,
+            BigDecimal estimatedCost
+    ) {
+        llmUsageLogRepository.save(LlmUsageLog.success(
+                memberId,
+                LlmFeatureType.INQUIRY_QNA,
+                modelName,
+                promptTokens,
+                completionTokens,
+                totalTokens,
+                resolveEstimatedCost(modelName, promptTokens, completionTokens, estimatedCost)
+        ));
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void saveInquiryFailureLog(Long memberId, String modelName, String failureMessage) {
+        llmUsageLogRepository.save(LlmUsageLog.failed(
+                memberId,
+                LlmFeatureType.INQUIRY_QNA,
                 modelName,
                 truncateFailureMessage(failureMessage)
         ));

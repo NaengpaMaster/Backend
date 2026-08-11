@@ -1,6 +1,7 @@
 package com.naengpa.naengpamasterbackend.agent.usage;
 
 import com.naengpa.naengpamasterbackend.agent.usage.entity.LlmCallStatus;
+import com.naengpa.naengpamasterbackend.agent.usage.entity.LlmFeatureType;
 import com.naengpa.naengpamasterbackend.agent.usage.service.AdminLlmUsageLogService;
 import com.naengpa.naengpamasterbackend.agent.usage.service.LlmUsageLogService;
 import com.naengpa.naengpamasterbackend.member.entity.HouseholdType;
@@ -60,6 +61,7 @@ class AdminLlmUsageLogServiceTests {
                 .first()
                 .satisfies(log -> {
                     assertThat(log.nickname()).isEqualTo(successMember.getNickname());
+                    assertThat(log.featureType()).isEqualTo(LlmFeatureType.SHOPPING_RECOMMENDATION);
                     assertThat(log.status()).isEqualTo(LlmCallStatus.SUCCESS);
                 });
 

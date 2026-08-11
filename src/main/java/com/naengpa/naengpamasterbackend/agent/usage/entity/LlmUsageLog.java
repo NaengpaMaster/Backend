@@ -21,6 +21,10 @@ public class LlmUsageLog {
     @Column(name = "member_id", nullable = false)
     private Long memberId;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "feature_type", nullable = false, length = 30)
+    private LlmFeatureType featureType;
+
     @Column(name = "model_name", nullable = false, length = 100)
     private String modelName;
 
@@ -48,6 +52,7 @@ public class LlmUsageLog {
 
     public static LlmUsageLog success(
             Long memberId,
+            LlmFeatureType featureType,
             String modelName,
             Integer promptTokens,
             Integer completionTokens,
@@ -56,6 +61,7 @@ public class LlmUsageLog {
     ) {
         LlmUsageLog llmUsageLog = new LlmUsageLog();
         llmUsageLog.memberId = memberId;
+        llmUsageLog.featureType = featureType;
         llmUsageLog.modelName = modelName;
         llmUsageLog.promptTokens = promptTokens;
         llmUsageLog.completionTokens = completionTokens;
@@ -68,11 +74,13 @@ public class LlmUsageLog {
 
     public static LlmUsageLog failed(
             Long memberId,
+            LlmFeatureType featureType,
             String modelName,
             String failureMessage
     ) {
         LlmUsageLog llmUsageLog = new LlmUsageLog();
         llmUsageLog.memberId = memberId;
+        llmUsageLog.featureType = featureType;
         llmUsageLog.modelName = modelName;
         llmUsageLog.promptTokens = 0;
         llmUsageLog.completionTokens = 0;
