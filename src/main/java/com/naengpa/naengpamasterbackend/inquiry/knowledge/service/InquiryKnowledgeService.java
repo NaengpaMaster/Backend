@@ -25,6 +25,7 @@ public class InquiryKnowledgeService {
     private final InquiryKnowledgeDocumentRepository documentRepository;
     private final InquiryKnowledgeChunkRepository chunkRepository;
 
+    // 정책 문서를 등록 또는 갱신하고 검색에 사용할 청크를 다시 생성합니다.
     @Transactional
     public InquiryKnowledgeDocumentResponse saveDocument(InquiryKnowledgeDocumentRequest request) {
         String title = request.title().trim();
@@ -47,6 +48,7 @@ public class InquiryKnowledgeService {
         return InquiryKnowledgeDocumentResponse.from(document, contents.size());
     }
 
+    // 질문과 유사한 정책 문서 청크를 최대 요청 개수만큼 조회합니다.
     @Transactional(readOnly = true)
     public List<InquiryKnowledgeContextResponse> findRelevantContexts(String question, int limit) {
         if (question == null || question.isBlank()) {
@@ -59,6 +61,7 @@ public class InquiryKnowledgeService {
                 .toList();
     }
 
+    // 문서를 문단 기준으로 묶고 1,200자를 넘는 문단은 고정 길이로 분할합니다.
     static List<String> splitIntoChunks(String content) {
         List<String> chunks = new ArrayList<>();
         StringBuilder chunk = new StringBuilder();
@@ -91,6 +94,7 @@ public class InquiryKnowledgeService {
         return chunks;
     }
 
+    // 조립 중인 청크가 있으면 결과 목록에 추가하고 버퍼를 비웁니다.
     private static void flush(List<String> chunks, StringBuilder chunk) {
         if (!chunk.isEmpty()) {
             chunks.add(chunk.toString());
@@ -98,6 +102,7 @@ public class InquiryKnowledgeService {
         }
     }
 
+    // 분할된 문자열을 저장 가능한 정책 문서 청크 엔티티로 변환합니다.
     private static List<InquiryKnowledgeChunk> toChunks(Long documentId, List<String> contents) {
         List<InquiryKnowledgeChunk> chunks = new ArrayList<>(contents.size());
         for (int index = 0; index < contents.size(); index++) {

@@ -42,6 +42,7 @@ public class InquiryChatService {
     private final InquiryChatAgentClient agentClient;
     private final LlmUsageLogService usageLogService;
 
+    // 질문·정책 문서·이전 대화를 Agent에 전달하고 대화 및 사용량을 저장합니다.
     @Transactional
     public InquiryChatAnswerResponse sendMessage(String email, InquiryChatMessageRequest request) {
         Member member = memberRepository.findByEmail(email)
@@ -88,6 +89,7 @@ public class InquiryChatService {
         }
     }
 
+    // 기존 세션의 소유권을 확인하거나 새 대화 세션을 생성합니다.
     private InquiryChatSession resolveSession(Long memberId, Long sessionId, String question) {
         if (sessionId != null) {
             return sessionRepository.findByIdAndMemberIdAndDeletedFalse(sessionId, memberId)
@@ -98,6 +100,7 @@ public class InquiryChatService {
         return sessionRepository.save(InquiryChatSession.create(memberId, title));
     }
 
+    // Agent에 전달할 최근 메시지 10개를 시간순으로 조회합니다.
     private List<InquiryChatHistoryMessage> recentHistory(Long sessionId) {
         List<InquiryChatMessage> messages = new ArrayList<>(
                 messageRepository.findTop10BySessionIdOrderByCreatedAtDesc(sessionId)
@@ -106,6 +109,7 @@ public class InquiryChatService {
         return messages.stream().map(InquiryChatHistoryMessage::from).toList();
     }
 
+    // 성공한 문의 챗봇 호출의 모델·토큰·예상 비용을 기록합니다.
     private void saveUsage(Long memberId, AgentLlmUsageResponse usage) {
         usageLogService.saveInquirySuccessLog(
                 memberId,

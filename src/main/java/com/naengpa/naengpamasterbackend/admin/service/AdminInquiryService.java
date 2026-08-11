@@ -35,6 +35,7 @@ public class AdminInquiryService {
     private final MemberRepository memberRepository;
     private final NotificationService notificationService;
 
+    // 답변 여부와 정렬 조건에 맞는 문의 목록을 페이지 단위로 조회합니다.
     @Transactional(readOnly = true)
     public Page<AdminInquiryResponse> getInquiries(Boolean isAnswered, Sort.Direction sortDirection, Pageable pageable) {
         boolean answered = Boolean.TRUE.equals(isAnswered);
@@ -61,15 +62,15 @@ public class AdminInquiryService {
         );
     }
 
+    // 문의 내용과 활성 답변을 상세 조회합니다.
     @Transactional(readOnly = true)
     public AdminInquiryDetailResponse getInquiryDetail(Long inquiryId) {
         return adminInquiryRepository.findInquiryDetail(inquiryId)
                 .orElseThrow(InquiryNotFoundException::new);
     }
 
-    /**
-     * 관리자 문의 답변을 등록하며, 사전 검사와 DB UNIQUE 제약으로 중복 답변을 방지한다.
-     */
+    // 관리자 답변을 등록하고 사전 검사와 DB UNIQUE 제약으로 중복 답변을 방지합니다.
+    // 문의에 등록된 활성 답변의 내용과 수정 관리자를 갱신합니다.
     @Transactional
     public void createInquiryAnswer(Long inquiryId, AdminAnswerRequest request, String adminEmail) {
         Inquiry inquiry = adminInquiryRepository.findByIdAndIsDeletedFalse(inquiryId)
@@ -101,6 +102,7 @@ public class AdminInquiryService {
         notificationService.createInquiryAnsweredNotification(inquiry.getMemberId(), inquiry.getId());
     }
 
+    // 활성 답변을 삭제 처리하고 문의를 미답변 상태로 변경합니다.
     @Transactional
     public void updateInquiryAnswer(Long inquiryId, Long answerId, AdminAnswerRequest request, String adminEmail) {
         adminInquiryRepository.findByIdAndIsDeletedFalse(inquiryId)
@@ -115,6 +117,7 @@ public class AdminInquiryService {
         inquiryAnswer.update(request.content(), adminId);
     }
 
+    // 문의와 문의에 연결된 활성 답변을 함께 삭제 처리합니다.
     @Transactional
     public void deleteInquiryAnswer(Long inquiryId, Long answerId) {
         Inquiry inquiry = adminInquiryRepository
@@ -141,6 +144,7 @@ public class AdminInquiryService {
         inquiry.delete();
     }
 
+    // 인증 이메일에 해당하는 관리자 회원 ID를 조회합니다.
     private Long resolveAdminIdOrThrow(String email) {
         if (!StringUtils.hasText(email)) {
             throw new MemberNotFoundException();
@@ -150,9 +154,7 @@ public class AdminInquiryService {
                 .orElseThrow(MemberNotFoundException::new);
     }
 
-    /**
-     * 예외 원인을 순회하며 활성 답변 중복 방지 UNIQUE 제약조건 위반인지 확인함
-     */
+    // 예외 원인을 순회하며 활성 답변 중복 방지 UNIQUE 제약조건 위반인지 확인합니다.
     private boolean isActiveAnswerUniqueViolation(Throwable exception) {
         Throwable cause = exception;
 

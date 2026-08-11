@@ -10,11 +10,12 @@ import java.util.List;
 
 public interface InquiryKnowledgeChunkRepository extends JpaRepository<InquiryKnowledgeChunk, Long> {
 
+    // 정책 문서에 연결된 기존 청크를 모두 삭제합니다.
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("DELETE FROM InquiryKnowledgeChunk c WHERE c.inquiryKnowledgeDocumentId = :documentId")
     void deleteAllByDocumentId(@Param("documentId") Long documentId);
 
-    // 소규모 정책 문서는 pg_trgm 검색으로 하며, 검색 품질이 부족할 때 임베딩 검색으로 교체한다.
+    // 질문과 유사한 활성 정책 문서 청크를 pg_trgm 유사도순으로 조회합니다.
     @Query(value = """
             SELECT d.source_name AS "sourceName",
                    c.content AS "content"
