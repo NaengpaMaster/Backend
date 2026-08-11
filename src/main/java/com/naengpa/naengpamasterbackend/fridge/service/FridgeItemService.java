@@ -18,6 +18,7 @@ import com.naengpa.naengpamasterbackend.fridge.entity.FridgeItemShareRequestStat
 import com.naengpa.naengpamasterbackend.fridge.repository.FridgeItemShareRequestRepository;
 import com.naengpa.naengpamasterbackend.fridge.repository.FridgeItemHistoryRepository;
 import com.naengpa.naengpamasterbackend.fridge.repository.FridgeItemRepository;
+import com.naengpa.naengpamasterbackend.fridge.report.service.ConsumedProductService;
 import com.naengpa.naengpamasterbackend.member.entity.Member;
 import com.naengpa.naengpamasterbackend.member.repository.MemberRepository;
 import com.naengpa.naengpamasterbackend.notification.service.NotificationService;
@@ -44,6 +45,7 @@ public class FridgeItemService {
     private final FridgeService fridgeService;
     private final FridgeItemShareRequestRepository fridgeItemShareRequestRepository;
     private final NotificationService notificationService;
+    private final ConsumedProductService consumedProductService;
 
     private Member findMemberByEmail(String email) {
         return memberRepository.findByEmail(email)
@@ -70,7 +72,8 @@ public class FridgeItemService {
             ProductRepository productRepository,
             FridgeService fridgeService,
             FridgeItemShareRequestRepository fridgeItemShareRequestRepository,
-            NotificationService notificationService) {
+            NotificationService notificationService,
+            ConsumedProductService consumedProductService) {
         this.fridgeItemRepository = fridgeItemRepository;
         this.fridgeItemHistoryRepository = fridgeItemHistoryRepository;
         this.memberRepository = memberRepository;
@@ -79,6 +82,7 @@ public class FridgeItemService {
         this.fridgeService = fridgeService;
         this.fridgeItemShareRequestRepository = fridgeItemShareRequestRepository;
         this.notificationService = notificationService;
+        this.consumedProductService = consumedProductService;
     }
 
     // 냉장고 재료 등록
@@ -243,8 +247,10 @@ public class FridgeItemService {
 
         FridgeItem fridgeItem = findAccessibleFridgeItem(fridgeItemId, fridge.getFridgeId());
 
+        String consumedQuantity = fridgeItem.getQuantity();
         fridgeItem.useAll();
         saveHistory(fridgeItem, member.getId(), FridgeItemHistoryAction.USED_ALL, findProductName(fridgeItem.getProductId()));
+        consumedProductService.recordConsumption(fridgeItem, member.getId(), consumedQuantity);
     }
 
     //냉장고 재료 일부 사용
@@ -269,8 +275,10 @@ public class FridgeItemService {
 
         FridgeItem fridgeItem = findAccessibleFridgeItem(fridgeItemId, fridge.getFridgeId());
 
+        String consumedQuantity = "%s → %s".formatted(fridgeItem.getQuantity(), request.quantity());
         fridgeItem.usePartial(request.quantity());
         saveHistory(fridgeItem, member.getId(), FridgeItemHistoryAction.USED_PARTIAL, findProductName(fridgeItem.getProductId()));
+        consumedProductService.recordConsumption(fridgeItem, member.getId(), consumedQuantity);
 
         return FridgeItemResponse.from(fridgeItem);
     }
@@ -296,14 +304,18 @@ public class FridgeItemService {
         boolean transferAll = Boolean.TRUE.equals(request.transferAll());
         String remainingQuantity = request.remainingQuantity() == null ? null : request.remainingQuantity().trim();
         if (transferAll) {
+            String consumedQuantity = sourceItem.getQuantity();
             sourceItem.useAll();
             saveHistory(sourceItem, member.getId(), FridgeItemHistoryAction.USED_ALL, product.getName());
+            consumedProductService.recordConsumption(sourceItem, member.getId(), consumedQuantity);
         } else {
             if (remainingQuantity == null || remainingQuantity.isBlank()) {
                 throw new IllegalArgumentException("일부만 나눌 때는 내 냉장고에 남길 수량을 입력해주세요.");
             }
+            String consumedQuantity = request.transferQuantity();
             sourceItem.usePartial(remainingQuantity);
             saveHistory(sourceItem, member.getId(), FridgeItemHistoryAction.USED_PARTIAL, product.getName());
+            consumedProductService.recordConsumption(sourceItem, member.getId(), consumedQuantity);
         }
 
         FridgeItem targetItem = FridgeItem.create(
@@ -392,14 +404,18 @@ public class FridgeItemService {
         boolean transferAll = Boolean.TRUE.equals(request.transferAll());
         String remainingQuantity = request.remainingQuantity() == null ? null : request.remainingQuantity().trim();
         if (transferAll) {
+            String consumedQuantity = sourceItem.getQuantity();
             sourceItem.useAll();
             saveHistory(sourceItem, requestedMember.getId(), FridgeItemHistoryAction.USED_ALL, product.getName());
+            consumedProductService.recordConsumption(sourceItem, requestedMember.getId(), consumedQuantity);
         } else {
             if (remainingQuantity == null || remainingQuantity.isBlank()) {
                 throw new IllegalArgumentException("일부만 전달할 때는 내 냉장고에 남길 수량을 입력해주세요.");
             }
+            String consumedQuantity = shareRequest.getRequestedQuantity();
             sourceItem.usePartial(remainingQuantity);
             saveHistory(sourceItem, requestedMember.getId(), FridgeItemHistoryAction.USED_PARTIAL, product.getName());
+            consumedProductService.recordConsumption(sourceItem, requestedMember.getId(), consumedQuantity);
         }
 
         FridgeItem targetItem = FridgeItem.create(

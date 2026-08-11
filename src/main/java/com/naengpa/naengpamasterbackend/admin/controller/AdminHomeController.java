@@ -21,7 +21,7 @@ public class AdminHomeController {
 
     private final AdminHomeService adminHomeService;
 
-    @Operation(summary = "관리자 홈 조회", description = "활성 회원, 신규·비활성 회원, 문의, 레시피 및 사전 재료 운영 요약을 조회합니다. 관리자 권한이 필요합니다.")
+    @Operation(summary = "관리자 홈 요약 조회", description = "활성 회원, 신규 가입, 비활성 전환, 미답변 문의 등 관리자 홈 화면 요약 지표를 조회합니다. 관리자 권한이 필요합니다.")
     @GetMapping
     public ResponseEntity<ApiResponse<AdminHomeResponse>> getHome() {
         return ResponseEntity.ok(ApiResponse.success(adminHomeService.getHome()));

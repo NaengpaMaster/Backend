@@ -6,6 +6,8 @@ import com.naengpa.naengpamasterbackend.global.auth.oauth2.dto.OAuth2EmailComple
 import com.naengpa.naengpamasterbackend.global.auth.oauth2.service.OAuth2AccountService;
 import com.naengpa.naengpamasterbackend.global.auth.service.EmailVerificationService;
 import com.naengpa.naengpamasterbackend.global.response.ApiResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
@@ -21,12 +23,14 @@ import java.time.Duration;
 @RestController
 @RequestMapping("/api/v1/auth/oauth2")
 @RequiredArgsConstructor
+@Tag(name = "OAuth2 추가 정보 입력", description = "소셜 로그인 최초 가입 시 이메일 인증 및 추가 프로필 입력 API")
 public class OAuth2EmailCompletionController {
 
     private final OAuth2AccountService oauth2AccountService;
     private final EmailVerificationService emailVerificationService;
 
 
+    @Operation(summary = "OAuth2 이메일 인증 코드 발송", description = "카카오/네이버 소셜 로그인 최초 가입 과정에서 사용할 이메일 인증 코드를 발송합니다.")
     @PostMapping("/email-verifications")
     public ResponseEntity<ApiResponse<Void>> sendEmailVerification(
             @Valid @RequestBody EmailVerificationRequest request
@@ -35,6 +39,7 @@ public class OAuth2EmailCompletionController {
         return ResponseEntity.ok(ApiResponse.success("소셜 로그인 이메일 인증 코드가 발송되었습니다.", null));
     }
 
+    @Operation(summary = "OAuth2 이메일 보완 가입 완료", description = "소셜 로그인 signupToken, 이메일 인증 코드, 닉네임, 가구 유형을 검증해 회원 가입을 완료하고 토큰을 발급합니다.")
     @PostMapping("/email-completion")
     public ResponseEntity<ApiResponse<TokenResponse>> completeEmail(
             @Valid @RequestBody OAuth2EmailCompletionRequest request
