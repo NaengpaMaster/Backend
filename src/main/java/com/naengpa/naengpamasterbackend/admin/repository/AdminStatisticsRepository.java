@@ -15,7 +15,7 @@ import java.util.List;
 @Repository
 public interface AdminStatisticsRepository extends JpaRepository<ExpiredProduct, Long> {
 
-    // 삭제되지 않은 레시피를 등록 주체별로 조회
+    // 삭제되지 않은 레시피 수를 전체·기본·회원·관리자 등록 주체별로 조회합니다.
     @Query(value = """
             SELECT COUNT(*) AS "totalCount",
                    COUNT(*) FILTER (WHERE r.created_by IS NULL) AS "baseCount",
@@ -27,7 +27,7 @@ public interface AdminStatisticsRepository extends JpaRepository<ExpiredProduct,
             """, nativeQuery = true)
     RecipeCountProjection countRecipesByCreatorType();
 
-    // 선택 기간 카테고리별 신규 레시피 수 조회
+    // 선택 기간의 신규 레시피 수를 카테고리와 등록 주체별로 조회합니다.
     @Query(value = """
             SELECT c.name AS "categoryName",
                    COUNT(1) AS "recipeCount",
@@ -48,7 +48,7 @@ public interface AdminStatisticsRepository extends JpaRepository<ExpiredProduct,
             @Param("endExclusive") LocalDateTime endExclusive
     );
 
-    // 선택 기간 날짜별 재료 등록·만료 조회
+    // 선택 기간의 재료 등록·만료 수를 일·주·월 단위로 조회합니다.
     @Query(value = """
             SELECT CAST(days.date AS DATE) AS date,
                    COALESCE(registered.count, 0) AS "registeredCount",
@@ -86,7 +86,7 @@ public interface AdminStatisticsRepository extends JpaRepository<ExpiredProduct,
             @Param("granularity") String granularity
     );
 
-    // 선택 기간 등록 재료 수 조회
+    // 선택 기간에 등록된 냉장고 재료 수를 조회합니다.
     @Query(value = """
             SELECT COUNT(*)
             FROM fridge_items
@@ -98,7 +98,7 @@ public interface AdminStatisticsRepository extends JpaRepository<ExpiredProduct,
             @Param("endExclusive") LocalDateTime endExclusive
     );
 
-    // 선택 기간 신규 레시피 수 조회
+    // 선택 기간에 등록된 신규 레시피 수를 조회합니다.
     @Query(value = """
             SELECT COUNT(*)
             FROM recipes
@@ -110,11 +110,11 @@ public interface AdminStatisticsRepository extends JpaRepository<ExpiredProduct,
             @Param("endExclusive") LocalDateTime endExclusive
     );
 
-    // 선택 기간 유통기한 만료 건수 조회
+    // 선택 기간의 유통기한 만료 건수를 조회합니다.
     @Query("SELECT COUNT(ep) FROM ExpiredProduct ep WHERE ep.createdAt BETWEEN :startDate AND :endDate")
     Long countByCreatedAtBetween(@Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
 
-    // 카테고리별 만료량 조회
+    // 선택 기간의 만료 건수를 카테고리별로 조회합니다.
     @Query("""
             SELECT ep.categoryName AS categoryName, COUNT(ep) AS expiredCount
             FROM ExpiredProduct ep
@@ -127,7 +127,7 @@ public interface AdminStatisticsRepository extends JpaRepository<ExpiredProduct,
             @Param("endDate") LocalDate endDate
     );
 
-    // top 5 만료 재료 조회 (7일)
+    // 선택 기간의 재료별 만료 건수를 내림차순으로 조회합니다.
     @Query("""
             SELECT ep.productName AS productName, COUNT(ep) AS expiredCount
             FROM ExpiredProduct ep
@@ -140,7 +140,7 @@ public interface AdminStatisticsRepository extends JpaRepository<ExpiredProduct,
             @Param("endDate") LocalDate endDate,
             Pageable pageable);
 
-    // 선택 기간 고유 이용 회원 수
+    // 선택 기간의 서비스별 고유 이용 회원 수를 조회합니다.
     @Query(value = """
             SELECT 'fridge' AS service, COUNT(DISTINCT f.member_id) AS count
             FROM fridge_items f
@@ -165,7 +165,7 @@ public interface AdminStatisticsRepository extends JpaRepository<ExpiredProduct,
             @Param("endExclusive") LocalDateTime endExclusive
     );
 
-    // 날짜 별 고유 이용 회원 수
+    // 선택 기간의 서비스별 고유 이용 회원 수를 일·주·월 단위로 조회합니다.
     @Query(value = """
             SELECT 'fridge' AS service,
                    CAST(DATE_TRUNC(CAST(:granularity AS TEXT), f.created_at) AS DATE) AS date,

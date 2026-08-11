@@ -23,6 +23,7 @@ public class InquiryChatQueryService {
     private final InquiryChatMessageRepository messageRepository;
     private final MemberRepository memberRepository;
 
+    // 로그인한 회원의 삭제되지 않은 대화 세션을 최신순으로 조회합니다.
     @Transactional(readOnly = true)
     public List<InquiryChatSessionResponse> findSessions(String email) {
         Member member = findMember(email);
@@ -32,6 +33,7 @@ public class InquiryChatQueryService {
                 .toList();
     }
 
+    // 로그인한 회원이 소유한 세션의 메시지를 시간순으로 조회합니다.
     @Transactional(readOnly = true)
     public List<InquiryChatMessageResponse> findMessages(String email, Long sessionId) {
         InquiryChatSession session = findOwnedSession(findMember(email).getId(), sessionId);
@@ -41,11 +43,13 @@ public class InquiryChatQueryService {
                 .toList();
     }
 
+    // 인증 이메일에 해당하는 회원을 조회합니다.
     private Member findMember(String email) {
         return memberRepository.findByEmail(email)
                 .orElseThrow(() -> new BadCredentialsException("회원을 찾을 수 없습니다."));
     }
 
+    // 회원이 소유한 삭제되지 않은 대화 세션을 조회합니다.
     private InquiryChatSession findOwnedSession(Long memberId, Long sessionId) {
         return sessionRepository.findByIdAndMemberIdAndDeletedFalse(sessionId, memberId)
                 .orElseThrow(InquiryChatSessionNotFoundException::new);

@@ -9,6 +9,7 @@ import java.util.Optional;
 @Repository
 public interface InquiryAnswerRepository extends JpaRepository<InquiryAnswer, Long> {
 
+    // 문의에 연결된 삭제되지 않은 답변을 조회합니다.
     Optional<InquiryAnswer> findByInquiryIdAndIsDeletedFalse(Long inquiryId);
 
 }

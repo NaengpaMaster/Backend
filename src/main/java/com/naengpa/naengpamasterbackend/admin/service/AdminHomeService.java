@@ -27,6 +27,7 @@ public class AdminHomeService {
     private final AdminStatisticsRepository adminStatisticsRepository;
     private final AdminProductRepository adminProductRepository;
 
+    // 관리자가 홈에서 확인할 오늘의 주요 운영 지표를 조회합니다.
     @Transactional(readOnly = true)
     public AdminHomeResponse getHome() {
         LocalDateTime now = LocalDateTime.now(KOREA_ZONE);

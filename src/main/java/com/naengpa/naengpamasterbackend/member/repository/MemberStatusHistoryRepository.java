@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 
 public interface MemberStatusHistoryRepository extends JpaRepository<MemberStatusHistory, Long> {
 
+    // 선택 기간의 회원 상태 변경 이력과 현재 회원 정보를 페이지 단위로 조회합니다.
     @Query(
             value = """
                     SELECT new com.naengpa.naengpamasterbackend.admin.dto.response.AdminMemberStatusHistoryResponse(

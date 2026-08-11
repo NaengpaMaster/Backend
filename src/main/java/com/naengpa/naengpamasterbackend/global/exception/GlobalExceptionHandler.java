@@ -262,5 +262,12 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.fail(exception.getMessage()));
     }
+  
+    @ExceptionHandler(QuizAlreadySolvedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleQuizAlreadySolvedException(QuizAlreadySolvedException exception)
+    {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiResponse.fail(exception.getMessage()));
+    }
 
 }

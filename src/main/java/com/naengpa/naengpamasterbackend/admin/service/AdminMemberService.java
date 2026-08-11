@@ -39,12 +39,14 @@ public class AdminMemberService {
     private final MemberStatusHistoryRepository memberStatusHistoryRepository;
     private final ScoreRepository scoreRepository;
 
+    // 역할·상태·검색어 조건에 맞는 회원 목록을 페이지 단위로 조회합니다.
     @Transactional(readOnly = true)
     public Page<AdminMemberResponse> getMembers(MemberRole role, MemberStatus status, String search, Pageable pageable) {
         return adminMemberRepository.findMembers(role, status, search, pageable)
                 .map(AdminMemberResponse::from);
     }
 
+    // 회원의 기본 정보와 냉파 점수를 조회합니다.
     @Transactional(readOnly = true)
     public AdminMemberDetailResponse getMemberDetail(Long memberId) {
         Member member = adminMemberRepository.findById(memberId)
@@ -56,6 +58,7 @@ public class AdminMemberService {
         return AdminMemberDetailResponse.of(member, naengpaScore);
     }
 
+    // 선택 기간의 회원 상태 변경 이력을 페이지 단위로 조회합니다.
     @Transactional(readOnly = true)
     public Page<AdminMemberStatusHistoryResponse> getMemberStatusHistories(
             StatisticsPeriod period,
@@ -68,6 +71,7 @@ public class AdminMemberService {
         );
     }
 
+    // 회원 상태를 변경하고 변경 이력 및 비활성 회원의 로그인 만료를 처리합니다.
     @Transactional
     public void updateMemberStatus(Long memberId, AdminMemberStatusRequest request, String adminEmail) {
         Member member = adminMemberRepository.findById(memberId)
@@ -102,6 +106,7 @@ public class AdminMemberService {
         }
     }
 
+    // 회원 역할을 변경하고 자기 권한 해제 및 마지막 관리자 해제를 방지합니다.
     @Transactional
     public void updateMemberRole(Long memberId, AdminMemberRoleRequest request, String adminEmail) {
         Member member = adminMemberRepository.findById(memberId)

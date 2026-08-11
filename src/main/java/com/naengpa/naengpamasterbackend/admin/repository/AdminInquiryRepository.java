@@ -16,9 +16,11 @@ import java.util.Optional;
 @Repository
 public interface AdminInquiryRepository extends JpaRepository<Inquiry, Long> {
 
+    // 삭제되지 않은 전체 미답변 문의 수를 조회합니다.
     @Query("SELECT COUNT(i) FROM Inquiry i WHERE i.isAnswered = false AND i.isDeleted = false")
     Long countPendingInquiries();
 
+    // 기준 시각보다 오래된 미답변 문의 수를 조회합니다.
     @Query("""
             SELECT COUNT(i)
             FROM Inquiry i
@@ -28,6 +30,7 @@ public interface AdminInquiryRepository extends JpaRepository<Inquiry, Long> {
             """)
     Long countPendingInquiriesCreatedBefore(@Param("cutoff") LocalDateTime cutoff);
 
+    // 문의·작성자·활성 답변을 조인해 관리자 문의 상세를 조회합니다.
     @Query("""
             SELECT new com.naengpa.naengpamasterbackend.admin.dto.response.AdminInquiryDetailResponse(
                 i.id,
@@ -52,8 +55,10 @@ public interface AdminInquiryRepository extends JpaRepository<Inquiry, Long> {
             @Param("inquiryId") Long inquiryId
     );
 
+    // 삭제되지 않은 문의를 ID로 조회합니다.
     Optional<Inquiry> findByIdAndIsDeletedFalse(Long inquiryId);
 
+    // 답변 여부에 맞는 문의와 작성자 닉네임을 페이지 단위로 조회합니다.
     @Query(
             value = """
                 SELECT new com.naengpa.naengpamasterbackend.admin.dto.response.AdminInquiryResponse(
