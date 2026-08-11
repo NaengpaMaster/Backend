@@ -38,7 +38,7 @@ public class QuizController {
         String email = userDetails.getUsername();
 
         return ResponseEntity.ok(
-          ApiResponse.success("퀴즈 제출에 성공햇습니다.", quizService.submitQuiz(email, request))
+          ApiResponse.success("퀴즈 제출에 성공했습니다.", quizService.submitQuiz(email, request))
         );
     }
 
