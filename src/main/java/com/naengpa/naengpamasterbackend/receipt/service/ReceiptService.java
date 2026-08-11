@@ -3,10 +3,16 @@ package com.naengpa.naengpamasterbackend.receipt.service;
 import com.naengpa.naengpamasterbackend.global.exception.InvalidReceiptImageException;
 import com.naengpa.naengpamasterbackend.global.exception.MemberNotFoundException;
 import com.naengpa.naengpamasterbackend.global.s3.S3Uploader;
+import com.naengpa.naengpamasterbackend.fridge.dto.request.FridgeItemCreateRequest;
+import com.naengpa.naengpamasterbackend.fridge.dto.response.FridgeItemResponse;
+import com.naengpa.naengpamasterbackend.fridge.service.FridgeItemService;
 import com.naengpa.naengpamasterbackend.member.entity.Member;
 import com.naengpa.naengpamasterbackend.member.repository.MemberRepository;
 import com.naengpa.naengpamasterbackend.product.entity.Product;
+import com.naengpa.naengpamasterbackend.product.exception.ProductNotFoundException;
 import com.naengpa.naengpamasterbackend.product.repository.ProductRepository;
+import com.naengpa.naengpamasterbackend.receipt.dto.request.ReceiptAnalysisItemUpdateRequest;
+import com.naengpa.naengpamasterbackend.receipt.dto.request.ReceiptFridgeRegisterRequest;
 import com.naengpa.naengpamasterbackend.receipt.dto.request.ReceiptOcrItemRequest;
 import com.naengpa.naengpamasterbackend.receipt.dto.request.ReceiptOcrSaveRequest;
 import com.naengpa.naengpamasterbackend.receipt.dto.response.ReceiptAnalysisItemResponse;
@@ -39,19 +45,22 @@ public class ReceiptService {
     private final S3Uploader s3Uploader;
     private final ReceiptAnalysisItemRepository receiptAnalysisItemRepository;
     private final ProductRepository productRepository;
+    private final FridgeItemService fridgeItemService;
 
     public ReceiptService(
             MemberRepository memberRepository,
             ReceiptAnalysisRepository receiptAnalysisRepository,
             S3Uploader s3Uploader,
             ReceiptAnalysisItemRepository receiptAnalysisItemRepository,
-            ProductRepository productRepository
+            ProductRepository productRepository,
+            FridgeItemService fridgeItemService
     ) {
         this.memberRepository = memberRepository;
         this.receiptAnalysisRepository = receiptAnalysisRepository;
         this.s3Uploader = s3Uploader;
         this.receiptAnalysisItemRepository = receiptAnalysisItemRepository;
         this.productRepository = productRepository;
+        this.fridgeItemService = fridgeItemService;
     }
 
     @Transactional
@@ -122,6 +131,102 @@ public class ReceiptService {
         return items.stream()
                 .map(ReceiptAnalysisItemResponse::from)
                 .toList();
+    }
+
+    @Transactional
+    public ReceiptAnalysisItemResponse updateReceiptAnalysisItem(
+            String email,
+            Long receiptItemId,
+            ReceiptAnalysisItemUpdateRequest request
+    ) {
+        ReceiptAnalysisItem item = findOwnedReceiptItem(email, receiptItemId);
+        validatePending(item);
+
+        // 사용자가 직접 고른 사전 재료로 후보 매칭 정보를 교체
+        Product product = productRepository.findById(request.productId())
+                .filter(Product::getIsActive)
+                .orElseThrow(() -> new ProductNotFoundException(request.productId()));
+
+        item.updateMatchedProduct(
+                product.getProductId(),
+                product.getName(),
+                request.quantity(),
+                calculateExpiryDate(product)
+        );
+
+        return ReceiptAnalysisItemResponse.from(item);
+    }
+
+    @Transactional
+    public void rejectReceiptAnalysisItem(String email, Long receiptItemId) {
+        ReceiptAnalysisItem item = findOwnedReceiptItem(email, receiptItemId);
+        validatePending(item);
+        // 제외된 후보는 이후 냉장고 일괄 등록 대상에서 빠짐
+        item.reject();
+    }
+
+    @Transactional
+    public List<FridgeItemResponse> registerReceiptItemsToFridge(
+            String email,
+            Long receiptAnalysisId,
+            ReceiptFridgeRegisterRequest request
+    ) {
+        Member member = findMemberByEmail(email);
+        receiptAnalysisRepository.findByReceiptAnalysisIdAndMemberId(receiptAnalysisId, member.getId())
+                .orElseThrow();
+
+        if (request != null && (request.receiptItemIds() == null || request.receiptItemIds().isEmpty())) {
+            throw new IllegalArgumentException("등록할 영수증 후보를 선택해주세요.");
+        }
+
+        // request가 없으면 전체 PENDING 후보, 선택 목록이 있으면 선택한 후보만 등록
+        List<Long> selectedItemIds = request == null ? null : request.receiptItemIds();
+        List<ReceiptAnalysisItem> items = receiptAnalysisItemRepository
+                .findByReceiptAnalysisIdOrderByCreatedAtAsc(receiptAnalysisId)
+                .stream()
+                .filter(ReceiptAnalysisItem::isPending)
+                .filter(item -> selectedItemIds == null
+                        || selectedItemIds.contains(item.getReceiptAnalysisItemId()))
+                .toList();
+
+        return items.stream()
+                .map(item -> registerReceiptItem(email, item))
+                .toList();
+    }
+
+    private FridgeItemResponse registerReceiptItem(String email, ReceiptAnalysisItem item) {
+        // 냉장고 등록 검증 정책을 유지하기 위해 기존 FridgeItemService를 그대로 재사용
+        FridgeItemResponse response = fridgeItemService.createFridgeItem(
+                email,
+                new FridgeItemCreateRequest(
+                        item.getProductId(),
+                        item.getQuantity(),
+                        item.getExpiryDate(),
+                        item.getMemo()
+                )
+        );
+        item.register();
+        return response;
+    }
+
+    private ReceiptAnalysisItem findOwnedReceiptItem(String email, Long receiptItemId) {
+        Member member = findMemberByEmail(email);
+        ReceiptAnalysisItem item = receiptAnalysisItemRepository.findById(receiptItemId)
+                .orElseThrow();
+
+        // 후보 항목 자체에는 memberId가 없으므로 상위 receipt_analysis로 소유자 검증
+        receiptAnalysisRepository.findByReceiptAnalysisIdAndMemberId(
+                item.getReceiptAnalysisId(),
+                member.getId()
+        ).orElseThrow();
+
+        return item;
+    }
+
+    private void validatePending(ReceiptAnalysisItem item) {
+        if (!item.isPending()) {
+            throw new IllegalArgumentException("처리 대기 중인 후보만 변경할 수 있습니다.");
+        }
     }
 
     private Optional<ReceiptAnalysisItem> createMatchedReceiptItem(

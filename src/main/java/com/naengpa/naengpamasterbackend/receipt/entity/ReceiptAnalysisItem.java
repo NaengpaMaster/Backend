@@ -86,6 +86,37 @@ public class ReceiptAnalysisItem {
         return item;
     }
 
+    public void updateMatchedProduct(
+            Long productId,
+            String matchedProductName,
+            String quantity,
+            LocalDate expiryDate
+    ) {
+        // OCR 후보를 사용자가 선택한 사전 재료 기준으로 다시 매칭
+        this.productId = productId;
+        this.normalizedName = matchedProductName;
+        this.matchedProductName = matchedProductName;
+        this.quantity = quantity;
+        this.expiryDate = expiryDate;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    public void reject() {
+        // 제외된 후보는 냉장고 등록 흐름에서 제외
+        this.status = ReceiptAnalysisItemStatus.REJECTED;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    public void register() {
+        // 냉장고 등록이 끝난 후보는 중복 등록되지 않도록 상태 변경
+        this.status = ReceiptAnalysisItemStatus.REGISTERED;
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    public boolean isPending() {
+        return status == ReceiptAnalysisItemStatus.PENDING;
+    }
+
     @PrePersist
     void prePersist() {
         createdAt = LocalDateTime.now();
