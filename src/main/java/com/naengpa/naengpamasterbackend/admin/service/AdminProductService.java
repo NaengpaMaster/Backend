@@ -3,6 +3,7 @@ package com.naengpa.naengpamasterbackend.admin.service;
 import com.naengpa.naengpamasterbackend.admin.dto.request.AdminProductCreateRequest;
 import com.naengpa.naengpamasterbackend.admin.dto.request.AdminProductUpdateRequest;
 import com.naengpa.naengpamasterbackend.admin.dto.response.AdminProductResponse;
+import com.naengpa.naengpamasterbackend.admin.dto.response.AdminProductPageResponse;
 import com.naengpa.naengpamasterbackend.admin.repository.AdminProductRepository;
 import com.naengpa.naengpamasterbackend.global.exception.DuplicateProductNameException;
 import com.naengpa.naengpamasterbackend.product.entity.Product;
@@ -10,6 +11,8 @@ import com.naengpa.naengpamasterbackend.product.exception.ProductNotFoundExcepti
 import com.naengpa.naengpamasterbackend.product.repository.ProductCategoryRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 
@@ -34,12 +37,17 @@ public class AdminProductService {
     }
 
     //어드민 사전 재료 전체 조회
-    public List<AdminProductResponse> findAllProducts() {
+    @Transactional(readOnly = true)
+    public AdminProductPageResponse findAllProducts(String search, Pageable pageable) {
+        Page<AdminProductResponse> products = adminProductRepository
+                .findProducts(search == null ? "" : search.trim(), pageable)
+                .map(AdminProductResponse::from);
 
-        return adminProductRepository.findAllByOrderByProductIdAsc().stream()
-                .map(AdminProductResponse::from)
-                .toList();
-
+        return AdminProductPageResponse.from(
+                products,
+                adminProductRepository.count(),
+                adminProductRepository.countByIsActiveTrue()
+        );
     }
 
     //어드민 사전 재료 비활성 조회
