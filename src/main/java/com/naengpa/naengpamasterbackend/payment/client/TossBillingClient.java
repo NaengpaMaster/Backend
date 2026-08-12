@@ -48,6 +48,30 @@ public class TossBillingClient {
         }
     }
 
+    // 저장된 billingKey로 Toss 자동결제를 승인
+    public TossBillingPaymentResponse approveBillingPayment(
+            String billingKey,
+            String customerKey,
+            String orderId,
+            String orderName,
+            int amount
+    ) {
+        if (!StringUtils.hasText(secretKey)) {
+            throw new TossPaymentException("TossPayments Secret Key가 설정되지 않았습니다.");
+        }
+
+        try {
+            return restClient.post()
+                    .uri("/v1/billing/{billingKey}", billingKey)
+                    .header("Authorization", basicAuthHeader())
+                    .body(new TossBillingPaymentRequest(customerKey, amount, orderId, orderName))
+                    .retrieve()
+                    .body(TossBillingPaymentResponse.class);
+        } catch (RestClientResponseException exception) {
+            throw new TossPaymentException("TossPayments 자동결제 승인에 실패했습니다.");
+        }
+    }
+
     private String basicAuthHeader() {
         String token = Base64.getEncoder()
                 .encodeToString((secretKey + ":").getBytes(StandardCharsets.UTF_8));
@@ -58,6 +82,15 @@ public class TossBillingClient {
     private record TossBillingKeyIssueRequest(
             String authKey,
             String customerKey
+    ) {
+    }
+
+    // Toss 자동결제 승인 요청 전용 내부 DTO
+    private record TossBillingPaymentRequest(
+            String customerKey,
+            int amount,
+            String orderId,
+            String orderName
     ) {
     }
 
@@ -89,4 +122,16 @@ public class TossBillingClient {
             private String number;
         }
     }
+
+    @Getter
+    public static class TossBillingPaymentResponse {
+
+        private String paymentKey;
+        private String orderId;
+        private String orderName;
+        private String status;
+        private Integer totalAmount;
+        private String approvedAt;
+    }
+
 }
