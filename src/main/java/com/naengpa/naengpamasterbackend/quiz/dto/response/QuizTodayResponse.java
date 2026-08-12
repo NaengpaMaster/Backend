@@ -6,5 +6,6 @@ public record QuizTodayResponse (
     String sourceProductName,
     Boolean alreadySolved,
     Boolean submittedAnswer,
-    Boolean isCorrect
+    Boolean isCorrect,
+    String explanation
 ){}
