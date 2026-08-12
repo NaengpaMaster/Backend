@@ -36,7 +36,7 @@ public class QuizServiceImpl implements QuizService {
 
         if (quizQpt.isEmpty()) {
             // 오늘의 퀴즈 미생성 상태
-            return new QuizTodayResponse(null, null, null, true, null, null);
+            return new QuizTodayResponse(null, null, null, true, null, null, null);
         }
 
         Quiz quiz = quizQpt.get();
@@ -54,7 +54,8 @@ public class QuizServiceImpl implements QuizService {
                     quiz.getSourceProductName(),
                     true,
                     result.getSubmittedAnswer(),
-                    result.getIsCorrect()
+                    result.getIsCorrect(),
+                    quiz.getExplanation()
             );
         }
 
@@ -63,6 +64,7 @@ public class QuizServiceImpl implements QuizService {
                 quiz.getStatement(),
                 quiz.getSourceProductName(),
                 false,
+                null,
                 null,
                 null
         );
