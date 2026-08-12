@@ -3,6 +3,10 @@ spring:
     import: optional:classpath:application-secret.env[.properties]
   application:
     name: NaengpaMasterBackend
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
   datasource:
     url: ${DB_URL}
     driver-class-name: ${DB_DRIVER_CLASS_NAME}
@@ -71,14 +75,14 @@ jwt:
 agent:
   enabled: ${AGENT_ENABLED:false}
   base-url: ${AGENT_BASE_URL:http://localhost:8000}
-  api-key: ${AGENT_API_KEY}
+  api-key: ${AGENT_API_KEY:local-agent-api-key}
 
 aws:
   s3:
-    access-key-id: ${AWS_ACCESS_KEY_ID}
-    secret-access-key: ${AWS_SECRET_ACCESS_KEY}
-    region: ${AWS_REGION}
-    bucket: ${AWS_S3_BUCKET}
+    access-key-id: ${AWS_ACCESS_KEY_ID:local-access-key}
+    secret-access-key: ${AWS_SECRET_ACCESS_KEY:local-secret-key}
+    region: ${AWS_REGION:ap-northeast-2}
+    bucket: ${AWS_S3_BUCKET:naengpa-local}
 
 oauth2:
   frontend-redirect-url: ${OAUTH2_FRONTEND_REDIRECT_URL:http://localhost:3000}

@@ -8,22 +8,22 @@ import com.naengpa.naengpamasterbackend.admin.service.AdminMemberService;
 import com.naengpa.naengpamasterbackend.global.response.ApiResponse;
 import com.naengpa.naengpamasterbackend.member.entity.MemberRole;
 import com.naengpa.naengpamasterbackend.member.entity.MemberStatus;
-import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 
-@Tag(name = "관리자 회원", description = "관리자 회원 조회 및 상태·권한 관리 API")
+@Tag(name = "관리자 회원 관리", description = "관리자 회원 목록/상세 조회, 회원 상태 및 권한 변경 API")
 @SecurityRequirement(name = "bearerAuth")
 @RestController
 @RequestMapping("/api/v1/admin/members")
@@ -66,7 +66,7 @@ public class AdminMemberController {
     }
 
     // 회원 role 변경
-    @Operation(summary = "회원 역할 변경", description = "회원 역할을 USER 또는 ADMIN으로 변경합니다. 관리자 권한이 필요합니다.")
+    @Operation(summary = "회원 역할 변경", description = "회원 역할을 USER 또는 ADMIN으로 변경합니다. 자기 자신의 관리자 권한 해제와 마지막 관리자 해제는 차단됩니다. 관리자 권한이 필요합니다.")
     @PatchMapping("/{memberId}/role")
     public ResponseEntity<ApiResponse<Void>> updateMemberRole(
             @Parameter(description = "회원 ID", example = "1") @PathVariable Long memberId,

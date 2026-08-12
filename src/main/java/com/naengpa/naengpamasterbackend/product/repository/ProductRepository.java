@@ -5,6 +5,7 @@ import com.naengpa.naengpamasterbackend.quiz.dto.ProductNameId;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
+import java.util.Optional;
 import java.util.List;
 
 public interface ProductRepository extends JpaRepository<Product, Long> {
@@ -21,7 +22,11 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     List<Product> findByIsActiveTrue();
 
+    // exact match용
+    Optional<Product> findByNameAndIsActiveTrue(String name);
+  
     @Query("SELECT new com.naengpa.naengpamasterbackend.quiz.dto.ProductNameId(p.productId, p.name) " +
             "FROM Product p WHERE p.isActive = true")
     List<ProductNameId> findAllActiveProductNameIds();
+
 }

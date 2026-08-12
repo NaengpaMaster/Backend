@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-@Tag(name = "관리자 대시보드", description = "기존 관리자 대시보드 요약 API")
+@Tag(name = "관리자 대시보드", description = "관리자 대시보드 통계 요약 API")
 @SecurityRequirement(name = "bearerAuth")
 @RestController
 @RequestMapping("/api/v1/admin/dashboard")
@@ -21,7 +21,7 @@ public class AdminDashboardController {
 
     private final AdminDashboardService adminDashboardService;
 
-    @Operation(summary = "기존 관리자 대시보드 조회", description = "관리자, 활성·비활성 회원 및 미답변 문의 수를 조회합니다. 관리자 권한이 필요합니다.")
+    @Operation(summary = "관리자 대시보드 조회", description = "관리자 화면에서 사용할 회원/문의/레시피 등 운영 대시보드 요약 정보를 조회합니다. 관리자 권한이 필요합니다.")
     @GetMapping
     public ResponseEntity<ApiResponse<AdminDashboardResponse>> getDashboard() {
         return ResponseEntity.ok(ApiResponse.success(adminDashboardService.getDashboard()));
