@@ -1,5 +1,6 @@
 package com.naengpa.naengpamasterbackend.receipt;
 
+import com.naengpa.naengpamasterbackend.agent.usage.service.LlmUsageLogService;
 import com.naengpa.naengpamasterbackend.global.exception.InvalidReceiptImageException;
 import com.naengpa.naengpamasterbackend.global.s3.S3Uploader;
 import com.naengpa.naengpamasterbackend.fridge.dto.request.FridgeItemCreateRequest;
@@ -48,6 +49,7 @@ class ReceiptServiceTests {
     private ReceiptAnalysisItemRepository receiptAnalysisItemRepository;
     private ProductRepository productRepository;
     private FridgeItemService fridgeItemService;
+    private LlmUsageLogService llmUsageLogService;
     private S3Uploader s3Uploader;
     private ReceiptService receiptService;
 
@@ -58,6 +60,7 @@ class ReceiptServiceTests {
         receiptAnalysisItemRepository = mock(ReceiptAnalysisItemRepository.class);
         productRepository = mock(ProductRepository.class);
         fridgeItemService = mock(FridgeItemService.class);
+        llmUsageLogService = mock(LlmUsageLogService.class);
         s3Uploader = mock(S3Uploader.class);
         receiptService = new ReceiptService(
                 memberRepository,
@@ -65,7 +68,8 @@ class ReceiptServiceTests {
                 s3Uploader,
                 receiptAnalysisItemRepository,
                 productRepository,
-                fridgeItemService
+                fridgeItemService,
+                llmUsageLogService
         );
     }
 
@@ -195,7 +199,8 @@ class ReceiptServiceTests {
                         new ReceiptOcrItemRequest("국산 팽이버섯 200g", "1개"),
                         new ReceiptOcrItemRequest("강릉최가두부 550g", "2개"),
                         new ReceiptOcrItemRequest("유상봉투", "1개")
-                )
+                ),
+                null
         );
 
         when(memberRepository.findByEmail("user@test.com")).thenReturn(Optional.of(member));

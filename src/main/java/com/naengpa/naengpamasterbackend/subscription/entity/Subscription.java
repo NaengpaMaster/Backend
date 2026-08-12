@@ -68,6 +68,49 @@ public class Subscription {
         return status == SubscriptionStatus.TRIALING || status == SubscriptionStatus.ACTIVE;
     }
 
+    public static Subscription createActive(
+            Long memberId,
+            Long fridgeId,
+            Long subscriptionPlanId,
+            LocalDateTime periodStartAt,
+            LocalDateTime periodEndAt,
+            LocalDateTime nextBillingAt
+    ) {
+        Subscription subscription = new Subscription();
+        subscription.memberId = memberId;
+        subscription.fridgeId = fridgeId;
+        subscription.subscriptionPlanId = subscriptionPlanId;
+        subscription.status = SubscriptionStatus.ACTIVE;
+        subscription.currentPeriodStartAt = periodStartAt;
+        subscription.currentPeriodEndAt = periodEndAt;
+        subscription.nextBillingAt = nextBillingAt;
+        return subscription;
+    }
+
+    public void renew(
+            Long subscriptionPlanId,
+            LocalDateTime periodStartAt,
+            LocalDateTime periodEndAt,
+            LocalDateTime nextBillingAt
+    ) {
+        this.subscriptionPlanId = subscriptionPlanId;
+        this.status = SubscriptionStatus.ACTIVE;
+        this.currentPeriodStartAt = periodStartAt;
+        this.currentPeriodEndAt = periodEndAt;
+        this.nextBillingAt = nextBillingAt;
+        this.canceledAt = null;
+    }
+
+    // 현재 이용 기간은 유지하고 다음 자동결제만 중단
+    public void reserveCancel() {
+        this.nextBillingAt = null;
+        this.canceledAt = LocalDateTime.now();
+    }
+
+    public boolean isCancelReserved() {
+        return canceledAt != null && nextBillingAt == null;
+    }
+
     @PrePersist
     void prePersist() {
         createdAt = LocalDateTime.now();
