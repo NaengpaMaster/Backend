@@ -125,6 +125,21 @@ public class Payment {
         this.nextRetryAt = nextRetryAt;
     }
 
+    // Toss 웹훅에서 결제 실패 이벤트가 오면 최종 실패 상태로 반영
+    public void markFailedByWebhook(String failedReason) {
+        this.status = PaymentStatus.FAILED;
+        this.failedReason = failedReason;
+        this.lastFailedAt = LocalDateTime.now();
+        this.nextRetryAt = null;
+    }
+
+    // Toss 웹훅에서 결제 취소 이벤트가 오면 취소 상태로 반영
+    public void markCanceled(String reason) {
+        this.status = PaymentStatus.CANCELED;
+        this.failedReason = reason;
+        this.nextRetryAt = null;
+    }
+
     @PrePersist
     void prePersist() {
         this.createdAt = LocalDateTime.now();
