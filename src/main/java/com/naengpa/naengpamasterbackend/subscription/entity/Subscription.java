@@ -129,6 +129,23 @@ public class Subscription {
         return canceledAt != null && nextBillingAt == null;
     }
 
+    public LocalDateTime getAvailableUntil() {
+        if (status == SubscriptionStatus.TRIALING) {
+            return trialEndsAt;
+        }
+
+        return currentPeriodEndAt;
+    }
+
+    public void revokeCancel() {
+        if (!isCancelReserved()) {
+            throw new IllegalArgumentException("해지 예약 상태가 아닙니다.");
+        }
+
+        this.canceledAt = null;
+        this.nextBillingAt = getAvailableUntil();
+    }
+
     @PrePersist
     void prePersist() {
         createdAt = LocalDateTime.now();

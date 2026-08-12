@@ -13,6 +13,7 @@ public record SubscriptionStatusResponse(
         boolean premium,
         LocalDateTime trialEndsAt,
         LocalDateTime currentPeriodEndAt,
+        LocalDateTime availableUntil,
         LocalDateTime nextBillingAt,
         LocalDateTime canceledAt,
         boolean cancelReserved
@@ -24,6 +25,7 @@ public record SubscriptionStatusResponse(
                 fridgeId,
                 null,
                 false,
+                null,
                 null,
                 null,
                 null,
@@ -41,6 +43,7 @@ public record SubscriptionStatusResponse(
                 subscription.allowsFamilyShare(),
                 subscription.getTrialEndsAt(),
                 subscription.getCurrentPeriodEndAt(),
+                subscription.getAvailableUntil(),
                 subscription.getNextBillingAt(),
                 subscription.getCanceledAt(),
                 subscription.isCancelReserved()

@@ -209,6 +209,12 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.fail(exception.getMessage()));
     }
 
+    @ExceptionHandler(SubscriptionNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleSubscriptionNotFoundException(SubscriptionNotFoundException exception) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.fail(exception.getMessage()));
+    }
+
     @ExceptionHandler(InquiryChatSessionNotFoundException.class)
     public ResponseEntity<ApiResponse<Void>> handleInquiryChatSessionNotFoundException(
             InquiryChatSessionNotFoundException exception

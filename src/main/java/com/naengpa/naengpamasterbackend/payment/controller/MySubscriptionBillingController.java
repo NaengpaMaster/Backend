@@ -58,4 +58,15 @@ public class MySubscriptionBillingController {
                 mySubscriptionBillingService.cancelMySubscription(authentication.getName())
         ));
     }
+
+    @Operation(summary = "구독 해지 예약 취소", description = "해지 예약을 취소하고 다음 자동결제를 다시 활성화합니다.")
+    @PatchMapping("/subscriptions/cancel/revoke")
+    public ResponseEntity<ApiResponse<SubscriptionStatusResponse>> revokeCancelMySubscription(
+            @Parameter(hidden = true) Authentication authentication
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "구독 해지 예약이 취소되었습니다.",
+                mySubscriptionBillingService.revokeCancelMySubscription(authentication.getName())
+        ));
+    }
 }
