@@ -3,6 +3,7 @@ package com.naengpa.naengpamasterbackend.quiz.service;
 import com.naengpa.naengpamasterbackend.global.exception.QuizAlreadySolvedException;
 import com.naengpa.naengpamasterbackend.member.entity.Member;
 import com.naengpa.naengpamasterbackend.member.repository.MemberRepository;
+import com.naengpa.naengpamasterbackend.quiz.QuizServiceImpl;
 import com.naengpa.naengpamasterbackend.quiz.dto.request.QuizSubmitRequest;
 import com.naengpa.naengpamasterbackend.quiz.dto.response.QuizSubmitResponse;
 import com.naengpa.naengpamasterbackend.quiz.dto.response.QuizTodayResponse;

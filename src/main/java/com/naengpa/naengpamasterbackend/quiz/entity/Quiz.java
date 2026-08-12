@@ -56,4 +56,15 @@ public class Quiz {
         quiz.quizDate = quizDate;
         return quiz;
     }
+
+    public static Quiz createFrom(Quiz source, LocalDate newDate){
+        Quiz quiz = new Quiz();
+        quiz.statement = source.statement;
+        quiz.answer = source.answer;
+        quiz.explanation = source.explanation;
+        quiz.sourceProductName = source.sourceProductName;
+        quiz.sourceProductId = source.sourceProductId;
+        quiz.quizDate = newDate;
+        return quiz;
+    }
 }
