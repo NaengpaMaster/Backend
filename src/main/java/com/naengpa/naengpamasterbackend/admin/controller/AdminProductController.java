@@ -3,6 +3,7 @@ package com.naengpa.naengpamasterbackend.admin.controller;
 import com.naengpa.naengpamasterbackend.admin.dto.request.AdminProductCreateRequest;
 import com.naengpa.naengpamasterbackend.admin.dto.request.AdminProductUpdateRequest;
 import com.naengpa.naengpamasterbackend.admin.dto.response.AdminProductResponse;
+import com.naengpa.naengpamasterbackend.admin.dto.response.AdminProductPageResponse;
 import com.naengpa.naengpamasterbackend.admin.service.AdminProductService;
 import com.naengpa.naengpamasterbackend.global.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -12,6 +13,9 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -27,8 +31,11 @@ public class AdminProductController {
     //사전 재료 전체 조회 (활성 + 비활성)
     @Operation(summary = "사전 재료 전체 목록 조회", description = "관리자가 활성/비활성 사전 재료 전체 목록을 조회합니다.")
     @GetMapping()
-    public ResponseEntity<ApiResponse<List<AdminProductResponse>>> findAllProducts() {
-        return ResponseEntity.ok(ApiResponse.success(adminProductService.findAllProducts()));
+    public ResponseEntity<ApiResponse<AdminProductPageResponse>> findAllProducts(
+            @RequestParam(required = false) String search,
+            @PageableDefault(size = 10, sort = "productId", direction = Sort.Direction.ASC) Pageable pageable
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(adminProductService.findAllProducts(search, pageable)));
     }
 
     //비활성 사전 재료 조회

@@ -86,6 +86,29 @@ public class ReceiptAnalysisItem {
         return item;
     }
 
+    public static ReceiptAnalysisItem createPending(
+            Long receiptAnalysisId,
+            Long productId,
+            String extractedName,
+            String normalizedName,
+            String matchedProductName,
+            String quantity,
+            LocalDate expiryDate,
+            String memo
+    ) {
+        ReceiptAnalysisItem item = new ReceiptAnalysisItem();
+        item.receiptAnalysisId = receiptAnalysisId;
+        item.productId = productId;
+        item.extractedName = extractedName;
+        item.normalizedName = normalizedName;
+        item.matchedProductName = matchedProductName;
+        item.quantity = quantity;
+        item.expiryDate = expiryDate;
+        item.status = ReceiptAnalysisItemStatus.PENDING;
+        item.memo = memo;
+        return item;
+    }
+
     public void updateMatchedProduct(
             Long productId,
             String matchedProductName,
