@@ -19,7 +19,7 @@ public class TossPaymentWebhookService {
 
     // TossPayments 웹훅을 저장하고, eventId 중복이 아니면 결제 상태를 반영
     @Transactional
-    public void handleWebhook(String transmissionId, TossPaymentWebhookRequest request, String rawPayload) {
+    public void handleWebhook(String transmissionId, TossPaymentWebhookRequest request) {
         String eventId = resolvedEventId(transmissionId, request);
         String eventType = requiredEventType(request);
 
@@ -31,7 +31,7 @@ public class TossPaymentWebhookService {
                 eventId,
                 eventType,
                 request.resolvedPaymentKey(),
-                defaultPayload(request, rawPayload)
+                defaultPayload(request)
         ));
 
         applyPaymentStatus(request, eventType);
@@ -87,11 +87,7 @@ public class TossPaymentWebhookService {
                 || "CANCELED".equals(paymentStatus);
     }
 
-    private String defaultPayload(TossPaymentWebhookRequest request, String rawPayload) {
-        if (rawPayload != null && !rawPayload.isBlank()) {
-            return rawPayload;
-        }
-
+    private String defaultPayload(TossPaymentWebhookRequest request) {
         if (request.payload() != null && !request.payload().isBlank()) {
             return request.payload();
         }

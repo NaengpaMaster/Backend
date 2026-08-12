@@ -13,7 +13,9 @@ public record SubscriptionStatusResponse(
         boolean premium,
         LocalDateTime trialEndsAt,
         LocalDateTime currentPeriodEndAt,
-        LocalDateTime nextBillingAt
+        LocalDateTime nextBillingAt,
+        LocalDateTime canceledAt,
+        boolean cancelReserved
 ) {
     public static SubscriptionStatusResponse free(Long memberId, Long fridgeId) {
         return new SubscriptionStatusResponse(
@@ -24,7 +26,9 @@ public record SubscriptionStatusResponse(
                 false,
                 null,
                 null,
-                null
+                null,
+                null,
+                false
         );
     }
 
@@ -37,7 +41,9 @@ public record SubscriptionStatusResponse(
                 subscription.allowsFamilyShare(),
                 subscription.getTrialEndsAt(),
                 subscription.getCurrentPeriodEndAt(),
-                subscription.getNextBillingAt()
+                subscription.getNextBillingAt(),
+                subscription.getCanceledAt(),
+                subscription.isCancelReserved()
         );
     }
 }

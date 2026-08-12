@@ -55,7 +55,7 @@ class TossPaymentWebhookServiceTests {
                 "payment-key",
                 "{}",
                 null
-        ), "{}");
+        ));
 
         // then
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
@@ -75,7 +75,7 @@ class TossPaymentWebhookServiceTests {
                 "payment-key",
                 "{}",
                 null
-        ), "{}");
+        ));
 
         // then
         verify(paymentWebhookEventRepository, never()).save(any(PaymentWebhookEvent.class));
@@ -101,7 +101,7 @@ class TossPaymentWebhookServiceTests {
                 "payment-key",
                 "{}",
                 null
-        ), "{}");
+        ));
 
         // then
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.CANCELED);
@@ -129,7 +129,7 @@ class TossPaymentWebhookServiceTests {
                         "paymentKey", "payment-key",
                         "status", "CANCELED"
                 )
-        ), "{\"eventType\":\"PAYMENT_STATUS_CHANGED\"}");
+        ));
 
         // then
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.CANCELED);

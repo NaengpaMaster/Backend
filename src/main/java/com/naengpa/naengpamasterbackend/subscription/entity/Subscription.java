@@ -101,6 +101,16 @@ public class Subscription {
         this.canceledAt = null;
     }
 
+    // 현재 이용 기간은 유지하고 다음 자동결제만 중단
+    public void reserveCancel() {
+        this.nextBillingAt = null;
+        this.canceledAt = LocalDateTime.now();
+    }
+
+    public boolean isCancelReserved() {
+        return canceledAt != null && nextBillingAt == null;
+    }
+
     @PrePersist
     void prePersist() {
         createdAt = LocalDateTime.now();
