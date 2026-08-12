@@ -1,4 +1,4 @@
-package com.naengpa.naengpamasterbackend.quiz.service;
+package com.naengpa.naengpamasterbackend.quiz;
 
 import com.naengpa.naengpamasterbackend.global.exception.QuizAlreadySolvedException;
 import com.naengpa.naengpamasterbackend.member.entity.Member;
