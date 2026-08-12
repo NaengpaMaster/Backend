@@ -23,7 +23,7 @@ public class DailyQuizScheduler {
     private final QuizRepository quizRepository;
     private final ProductRepository productRepository;
 
-    @Scheduled(cron = "0 9 10 * * *")
+    @Scheduled(cron = "0 0 0 * * *")
     public void generateDailyQuiz() {
         LocalDate today = LocalDate.now();
 
@@ -36,8 +36,12 @@ public class DailyQuizScheduler {
 
         ProductNameId ingredient = pickRandomIngredient();
 
-        QuizGenerationClient.QuizGenerationResult result =
-                quizGenerationClient.generateQuiz(ingredient.name());
+        QuizGenerationClient.QuizGenerationResult result = generateWithRetry(ingredient.name(), 3);
+
+        if (result == null){
+            handleGenerationFailure(today);
+            return;
+        }
 
         Quiz quiz = Quiz.create(
                 result.statement(),
@@ -51,6 +55,33 @@ public class DailyQuizScheduler {
         quizRepository.save(quiz);
 
         log.info("퀴즈 생성 완료 - ingredient: {}", ingredient.name());
+    }
+
+    private QuizGenerationClient.QuizGenerationResult generateWithRetry(String ingredient, int maxRetry){
+        for (int i = 0; i < maxRetry; i++){
+            try{
+                QuizGenerationClient.QuizGenerationResult result = quizGenerationClient.generateQuiz(ingredient);
+
+                if("low".equals(result.confidence())){
+                    log.warn("[품질 문제] 퀴즈 신뢰도 낮음 (시도 {}/{} - {})", i + 1, maxRetry);
+                    continue;
+                }
+                return result;
+            } catch (Exception e){
+                log.warn("[통신 문제] 퀴즈 생성 API 호출 실패 (시도 {}/{} - {})", i + 1, maxRetry, e.getMessage());
+            }
+        }
+        return null;
+    }
+
+    private void handleGenerationFailure(LocalDate today){
+        log.error("퀴즈 생성 3회 모두 실패, 과거 퀴즈로 대체 - date: {}", today);
+
+        Quiz pastQuiz = quizRepository.findRandomPastQuiz()
+                .orElseThrow(() -> new IllegalStateException("대체할 과거 퀴즈도 존재하지 않습니다."));
+
+        Quiz duplicated = Quiz.createFrom(pastQuiz, today);
+        quizRepository.save(duplicated);
     }
 
     private ProductNameId pickRandomIngredient() {
