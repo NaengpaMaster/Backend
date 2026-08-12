@@ -137,6 +137,46 @@ public class LlmUsageLogService {
         ));
     }
 
+    @Transactional
+    public void saveReceiptOcrSuccessLog(
+            Long memberId,
+            String modelName,
+            Integer promptTokens,
+            Integer completionTokens,
+            Integer totalTokens,
+            BigDecimal estimatedCost
+    ) {
+        llmUsageLogRepository.save(LlmUsageLog.success(
+                memberId,
+                LlmFeatureType.RECEIPT_OCR,
+                modelName,
+                promptTokens,
+                completionTokens,
+                totalTokens,
+                resolveEstimatedCost(modelName, promptTokens, completionTokens, estimatedCost)
+        ));
+    }
+
+    @Transactional
+    public void saveFridgePhotoSuccessLog(
+            Long memberId,
+            String modelName,
+            Integer promptTokens,
+            Integer completionTokens,
+            Integer totalTokens,
+            BigDecimal estimatedCost
+    ) {
+        llmUsageLogRepository.save(LlmUsageLog.success(
+                memberId,
+                LlmFeatureType.FRIDGE_PHOTO_ANALYSIS,
+                modelName,
+                promptTokens,
+                completionTokens,
+                totalTokens,
+                resolveEstimatedCost(modelName, promptTokens, completionTokens, estimatedCost)
+        ));
+    }
+
     private String truncateFailureMessage(String failureMessage) {
         if (failureMessage == null || failureMessage.length() <= FAILURE_MESSAGE_MAX_LENGTH) {
             return failureMessage;
