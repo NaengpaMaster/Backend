@@ -1,24 +1,24 @@
-package com.naengpa.naengpamasterbackend.receipt.service;
+package com.naengpa.naengpamasterbackend.fridge.photo.service;
 
 import com.naengpa.naengpamasterbackend.agent.shopping.client.dto.AgentLlmUsageResponse;
 import com.naengpa.naengpamasterbackend.agent.usage.service.LlmUsageLogService;
+import com.naengpa.naengpamasterbackend.fridge.dto.request.FridgeItemCreateRequest;
+import com.naengpa.naengpamasterbackend.fridge.dto.response.FridgeItemResponse;
+import com.naengpa.naengpamasterbackend.fridge.photo.dto.request.FridgePhotoItemUpdateRequest;
+import com.naengpa.naengpamasterbackend.fridge.photo.dto.request.FridgePhotoItemsRegisterRequest;
+import com.naengpa.naengpamasterbackend.fridge.photo.dto.request.FridgePhotoOcrItemRequest;
+import com.naengpa.naengpamasterbackend.fridge.photo.dto.request.FridgePhotoOcrSaveRequest;
+import com.naengpa.naengpamasterbackend.fridge.photo.dto.response.FridgePhotoImageUploadResponse;
+import com.naengpa.naengpamasterbackend.fridge.photo.dto.response.FridgePhotoItemResponse;
+import com.naengpa.naengpamasterbackend.fridge.service.FridgeItemService;
 import com.naengpa.naengpamasterbackend.global.exception.InvalidReceiptImageException;
 import com.naengpa.naengpamasterbackend.global.exception.MemberNotFoundException;
 import com.naengpa.naengpamasterbackend.global.s3.S3Uploader;
-import com.naengpa.naengpamasterbackend.fridge.dto.request.FridgeItemCreateRequest;
-import com.naengpa.naengpamasterbackend.fridge.dto.response.FridgeItemResponse;
-import com.naengpa.naengpamasterbackend.fridge.service.FridgeItemService;
 import com.naengpa.naengpamasterbackend.member.entity.Member;
 import com.naengpa.naengpamasterbackend.member.repository.MemberRepository;
 import com.naengpa.naengpamasterbackend.product.entity.Product;
 import com.naengpa.naengpamasterbackend.product.exception.ProductNotFoundException;
 import com.naengpa.naengpamasterbackend.product.repository.ProductRepository;
-import com.naengpa.naengpamasterbackend.receipt.dto.request.ReceiptAnalysisItemUpdateRequest;
-import com.naengpa.naengpamasterbackend.receipt.dto.request.ReceiptFridgeRegisterRequest;
-import com.naengpa.naengpamasterbackend.receipt.dto.request.ReceiptOcrItemRequest;
-import com.naengpa.naengpamasterbackend.receipt.dto.request.ReceiptOcrSaveRequest;
-import com.naengpa.naengpamasterbackend.receipt.dto.response.ReceiptAnalysisItemResponse;
-import com.naengpa.naengpamasterbackend.receipt.dto.response.ReceiptImageUploadResponse;
 import com.naengpa.naengpamasterbackend.receipt.entity.ReceiptAnalysis;
 import com.naengpa.naengpamasterbackend.receipt.entity.ReceiptAnalysisItem;
 import com.naengpa.naengpamasterbackend.receipt.repository.ReceiptAnalysisItemRepository;
@@ -38,99 +38,84 @@ import java.util.Set;
 import java.util.UUID;
 
 @Service
-public class ReceiptService {
+public class FridgePhotoService {
 
     private static final long MAX_IMAGE_SIZE = 10L * 1024 * 1024;
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of("jpg", "jpeg", "png");
     private static final Map<String, String> PRODUCT_ALIASES = createProductAliases();
 
-
     private final MemberRepository memberRepository;
     private final ReceiptAnalysisRepository receiptAnalysisRepository;
-    private final S3Uploader s3Uploader;
     private final ReceiptAnalysisItemRepository receiptAnalysisItemRepository;
     private final ProductRepository productRepository;
     private final FridgeItemService fridgeItemService;
+    private final S3Uploader s3Uploader;
     private final LlmUsageLogService llmUsageLogService;
 
-    public ReceiptService(
+    public FridgePhotoService(
             MemberRepository memberRepository,
             ReceiptAnalysisRepository receiptAnalysisRepository,
-            S3Uploader s3Uploader,
             ReceiptAnalysisItemRepository receiptAnalysisItemRepository,
             ProductRepository productRepository,
             FridgeItemService fridgeItemService,
+            S3Uploader s3Uploader,
             LlmUsageLogService llmUsageLogService
     ) {
         this.memberRepository = memberRepository;
         this.receiptAnalysisRepository = receiptAnalysisRepository;
-        this.s3Uploader = s3Uploader;
         this.receiptAnalysisItemRepository = receiptAnalysisItemRepository;
         this.productRepository = productRepository;
         this.fridgeItemService = fridgeItemService;
+        this.s3Uploader = s3Uploader;
         this.llmUsageLogService = llmUsageLogService;
     }
 
     @Transactional
-    public ReceiptImageUploadResponse uploadReceiptImage(String email, MultipartFile file) {
+    public FridgePhotoImageUploadResponse uploadFridgePhoto(String email, MultipartFile file) {
         Member member = findMemberByEmail(email);
         validateImage(file);
 
-        // 원본 확장자를 유지한 S3 저장 경로를 만든 뒤, 이미지를 S3에 임시 업로드
         String extension = extractExtension(file);
         String objectKey = createObjectKey(member.getId(), extension);
         String uploadedObjectKey = s3Uploader.upload(file, objectKey);
 
-        // OCR 분석 전 단계이므로 PENDING 상태의 분석 row를 생성
-        ReceiptAnalysis receiptAnalysis = ReceiptAnalysis.createPending(
+        ReceiptAnalysis analysis = ReceiptAnalysis.createPending(
                 member.getId(),
                 file.getOriginalFilename(),
                 uploadedObjectKey
         );
 
-        ReceiptAnalysis saved = receiptAnalysisRepository.save(receiptAnalysis);
-        return ReceiptImageUploadResponse.from(saved);
+        return FridgePhotoImageUploadResponse.from(receiptAnalysisRepository.save(analysis));
     }
 
     @Transactional(readOnly = true)
-    public List<ReceiptAnalysisItemResponse> getReceiptAnalysisItems(
-            String email,
-            Long receiptAnalysisId
-    ) {
+    public List<FridgePhotoItemResponse> getItems(String email, Long fridgePhotoAnalysisId) {
         Member member = findMemberByEmail(email);
+        receiptAnalysisRepository.findByReceiptAnalysisIdAndMemberId(fridgePhotoAnalysisId, member.getId())
+                .orElseThrow();
 
-        // receiptAnalysisId만으로 조회하면 타인의 영수증 후보가 노출될 수 있어 회원 ID까지 함께 확인
-        receiptAnalysisRepository.findByReceiptAnalysisIdAndMemberId(
-                receiptAnalysisId,
-                member.getId()
-        ).orElseThrow();
-
-        // 검증된 영수증 분석 ID에 연결된 OCR 후보 항목을 생성순으로 반환
         return receiptAnalysisItemRepository
-                .findByReceiptAnalysisIdOrderByCreatedAtAsc(receiptAnalysisId)
+                .findByReceiptAnalysisIdOrderByCreatedAtAsc(fridgePhotoAnalysisId)
                 .stream()
-                .map(ReceiptAnalysisItemResponse::from)
+                .map(FridgePhotoItemResponse::from)
                 .toList();
     }
 
     @Transactional
-    public List<ReceiptAnalysisItemResponse> saveOcrResult(
+    public List<FridgePhotoItemResponse> saveAnalysisResult(
             String email,
-            Long receiptAnalysisId,
-            ReceiptOcrSaveRequest request
+            Long fridgePhotoAnalysisId,
+            FridgePhotoOcrSaveRequest request
     ) {
         Member member = findMemberByEmail(email);
-
-        ReceiptAnalysis receiptAnalysis = receiptAnalysisRepository
-                .findByReceiptAnalysisIdAndMemberId(receiptAnalysisId, member.getId())
+        ReceiptAnalysis analysis = receiptAnalysisRepository
+                .findByReceiptAnalysisIdAndMemberId(fridgePhotoAnalysisId, member.getId())
                 .orElseThrow();
 
-        // Agent가 읽어낸 영수증 전체 원문을 분석 row에 저장해 추후 매칭 실패 원인을 확인할 수 있게 함
-        receiptAnalysis.updateRawOcrText(request.rawText());
+        analysis.updateRawOcrText(request.rawText());
 
-        // OCR 후보 중 사전 재료와 매칭된 항목만 냉장고 등록 후보로 저장
         List<ReceiptAnalysisItem> items = request.items().stream()
-                .map(item -> createMatchedReceiptItem(receiptAnalysisId, item))
+                .map(item -> createMatchedItem(fridgePhotoAnalysisId, item))
                 .flatMap(Optional::stream)
                 .toList();
 
@@ -138,20 +123,15 @@ public class ReceiptService {
         saveUsageLog(member.getId(), request.usage());
 
         return items.stream()
-                .map(ReceiptAnalysisItemResponse::from)
+                .map(FridgePhotoItemResponse::from)
                 .toList();
     }
 
     @Transactional
-    public ReceiptAnalysisItemResponse updateReceiptAnalysisItem(
-            String email,
-            Long receiptItemId,
-            ReceiptAnalysisItemUpdateRequest request
-    ) {
-        ReceiptAnalysisItem item = findOwnedReceiptItem(email, receiptItemId);
+    public FridgePhotoItemResponse updateItem(String email, Long fridgePhotoItemId, FridgePhotoItemUpdateRequest request) {
+        ReceiptAnalysisItem item = findOwnedItem(email, fridgePhotoItemId);
         validatePending(item);
 
-        // 사용자가 직접 고른 사전 재료로 후보 매칭 정보를 교체
         Product product = productRepository.findById(request.productId())
                 .filter(Product::getIsActive)
                 .orElseThrow(() -> new ProductNotFoundException(request.productId()));
@@ -163,35 +143,33 @@ public class ReceiptService {
                 calculateExpiryDate(product)
         );
 
-        return ReceiptAnalysisItemResponse.from(item);
+        return FridgePhotoItemResponse.from(item);
     }
 
     @Transactional
-    public void rejectReceiptAnalysisItem(String email, Long receiptItemId) {
-        ReceiptAnalysisItem item = findOwnedReceiptItem(email, receiptItemId);
+    public void rejectItem(String email, Long fridgePhotoItemId) {
+        ReceiptAnalysisItem item = findOwnedItem(email, fridgePhotoItemId);
         validatePending(item);
-        // 제외된 후보는 이후 냉장고 일괄 등록 대상에서 빠짐
         item.reject();
     }
 
     @Transactional
-    public List<FridgeItemResponse> registerReceiptItemsToFridge(
+    public List<FridgeItemResponse> registerItems(
             String email,
-            Long receiptAnalysisId,
-            ReceiptFridgeRegisterRequest request
+            Long fridgePhotoAnalysisId,
+            FridgePhotoItemsRegisterRequest request
     ) {
         Member member = findMemberByEmail(email);
-        receiptAnalysisRepository.findByReceiptAnalysisIdAndMemberId(receiptAnalysisId, member.getId())
+        receiptAnalysisRepository.findByReceiptAnalysisIdAndMemberId(fridgePhotoAnalysisId, member.getId())
                 .orElseThrow();
 
-        if (request != null && (request.receiptItemIds() == null || request.receiptItemIds().isEmpty())) {
-            throw new IllegalArgumentException("등록할 영수증 후보를 선택해주세요.");
+        if (request != null && (request.fridgePhotoItemIds() == null || request.fridgePhotoItemIds().isEmpty())) {
+            throw new IllegalArgumentException("등록할 냉장고 사진 후보를 선택해주세요.");
         }
 
-        // request가 없으면 전체 PENDING 후보, 선택 목록이 있으면 선택한 후보만 등록
-        List<Long> selectedItemIds = request == null ? null : request.receiptItemIds();
+        List<Long> selectedItemIds = request == null ? null : request.fridgePhotoItemIds();
         List<ReceiptAnalysisItem> items = receiptAnalysisItemRepository
-                .findByReceiptAnalysisIdOrderByCreatedAtAsc(receiptAnalysisId)
+                .findByReceiptAnalysisIdOrderByCreatedAtAsc(fridgePhotoAnalysisId)
                 .stream()
                 .filter(ReceiptAnalysisItem::isPending)
                 .filter(item -> selectedItemIds == null
@@ -199,12 +177,11 @@ public class ReceiptService {
                 .toList();
 
         return items.stream()
-                .map(item -> registerReceiptItem(email, item))
+                .map(item -> registerItem(email, item))
                 .toList();
     }
 
-    private FridgeItemResponse registerReceiptItem(String email, ReceiptAnalysisItem item) {
-        // 냉장고 등록 검증 정책을 유지하기 위해 기존 FridgeItemService를 그대로 재사용
+    private FridgeItemResponse registerItem(String email, ReceiptAnalysisItem item) {
         FridgeItemResponse response = fridgeItemService.createFridgeItem(
                 email,
                 new FridgeItemCreateRequest(
@@ -218,12 +195,54 @@ public class ReceiptService {
         return response;
     }
 
-    private ReceiptAnalysisItem findOwnedReceiptItem(String email, Long receiptItemId) {
+    private Optional<ReceiptAnalysisItem> createMatchedItem(Long fridgePhotoAnalysisId, FridgePhotoOcrItemRequest item) {
+        String normalizedName = resolveAlias(normalizeProductName(item.name()));
+
+        return findMatchedProduct(normalizedName)
+                .map(product -> ReceiptAnalysisItem.createPending(
+                        fridgePhotoAnalysisId,
+                        product.getProductId(),
+                        item.name(),
+                        normalizedName,
+                        product.getName(),
+                        defaultQuantity(item.quantity()),
+                        calculateExpiryDate(product),
+                        "냉장고 사진으로 등록"
+                ));
+    }
+
+    private void saveUsageLog(Long memberId, AgentLlmUsageResponse usage) {
+        if (usage == null) {
+            return;
+        }
+
+        llmUsageLogService.saveFridgePhotoSuccessLog(
+                memberId,
+                usage.modelName(),
+                usage.promptTokens(),
+                usage.completionTokens(),
+                usage.totalTokens(),
+                usage.estimatedCost()
+        );
+    }
+
+    private Optional<Product> findMatchedProduct(String normalizedName) {
+        Optional<Product> exactMatch = productRepository.findByNameAndIsActiveTrue(normalizedName);
+        if (exactMatch.isPresent()) {
+            return exactMatch;
+        }
+
+        return productRepository.findByIsActiveTrue()
+                .stream()
+                .filter(product -> normalizedName.contains(product.getName()))
+                .findFirst();
+    }
+
+    private ReceiptAnalysisItem findOwnedItem(String email, Long fridgePhotoItemId) {
         Member member = findMemberByEmail(email);
-        ReceiptAnalysisItem item = receiptAnalysisItemRepository.findById(receiptItemId)
+        ReceiptAnalysisItem item = receiptAnalysisItemRepository.findById(fridgePhotoItemId)
                 .orElseThrow();
 
-        // 후보 항목 자체에는 memberId가 없으므로 상위 receipt_analysis로 소유자 검증
         receiptAnalysisRepository.findByReceiptAnalysisIdAndMemberId(
                 item.getReceiptAnalysisId(),
                 member.getId()
@@ -238,59 +257,11 @@ public class ReceiptService {
         }
     }
 
-    private Optional<ReceiptAnalysisItem> createMatchedReceiptItem(
-            Long receiptAnalysisId,
-            ReceiptOcrItemRequest item
-    ) {
-        // OCR 상품명에서 원산지/용량 등 매칭에 방해되는 단어를 먼저 제거
-        String normalizedName = resolveAlias(normalizeProductName(item.name()));
-
-        return findMatchedProduct(normalizedName)
-                .map(product -> ReceiptAnalysisItem.createPending(
-                        receiptAnalysisId,
-                        product.getProductId(),
-                        item.name(),
-                        normalizedName,
-                        product.getName(),
-                        defaultQuantity(item.quantity()),
-                        calculateExpiryDate(product)
-                ));
-    }
-
-    private void saveUsageLog(Long memberId, AgentLlmUsageResponse usage) {
-        if (usage == null) {
-            return;
-        }
-
-        llmUsageLogService.saveReceiptOcrSuccessLog(
-                memberId,
-                usage.modelName(),
-                usage.promptTokens(),
-                usage.completionTokens(),
-                usage.totalTokens(),
-                usage.estimatedCost()
-        );
-    }
-
-    private Optional<Product> findMatchedProduct(String normalizedName) {
-        // 1순위는 정확히 같은 사전 재료명, 실패하면 OCR 상품명 안에 포함된 사전 재료명을 찾음
-        Optional<Product> exactMatch = productRepository.findByNameAndIsActiveTrue(normalizedName);
-        if (exactMatch.isPresent()) {
-            return exactMatch;
-        }
-
-        return productRepository.findByIsActiveTrue()
-                .stream()
-                .filter(product -> normalizedName.contains(product.getName()))
-                .findFirst();
-    }
-
     private String normalizeProductName(String name) {
         if (name == null) {
             return "";
         }
 
-        // MVP 정제 규칙: 자주 붙는 원산지/행사 문구와 단순 용량 표기를 제거
         return name
                 .replace("국산", "")
                 .replace("국내산", "")
@@ -423,7 +394,6 @@ public class ReceiptService {
         if (product.getDefaultExpiryDays() == null) {
             return null;
         }
-        // 사전 재료의 기본 유통기한이 있으면 오늘 기준으로 냉장고 등록 후보 유통기한을 미리 계산
         return LocalDate.now().plusDays(product.getDefaultExpiryDays());
     }
 
@@ -432,23 +402,21 @@ public class ReceiptService {
                 .orElseThrow(MemberNotFoundException::new);
     }
 
-    // 업로드 가능한 파일인지 확인. 현재 정책은 10MB 이하의 jpg, jpeg, png만 허용
     private void validateImage(MultipartFile file) {
         if (file == null || file.isEmpty()) {
-            throw new InvalidReceiptImageException("영수증 이미지를 업로드해주세요.");
+            throw new InvalidReceiptImageException("냉장고 사진을 업로드해주세요.");
         }
 
         if (file.getSize() > MAX_IMAGE_SIZE) {
-            throw new InvalidReceiptImageException("영수증 이미지는 10MB 이하만 업로드할 수 있습니다.");
+            throw new InvalidReceiptImageException("냉장고 사진은 10MB 이하만 업로드할 수 있습니다.");
         }
 
         String extension = extractExtension(file);
         if (!ALLOWED_EXTENSIONS.contains(extension)) {
-            throw new InvalidReceiptImageException("영수증 이미지는 jpg, jpeg, png 파일만 업로드할 수 있습니다.");
+            throw new InvalidReceiptImageException("냉장고 사진은 jpg, jpeg, png 파일만 업로드할 수 있습니다.");
         }
     }
 
-    // 파일명에서 확장자만 추출. JPG처럼 대문자로 들어와도 비교 가능하도록 소문자로 변경
     private String extractExtension(MultipartFile file) {
         String originalFilename = file.getOriginalFilename();
         String extension = StringUtils.getFilenameExtension(originalFilename);
@@ -458,13 +426,11 @@ public class ReceiptService {
         return extension.toLowerCase(Locale.ROOT);
     }
 
-    // 회원별 폴더 아래에 UUID 파일명으로 저장해 파일명 충돌과 원본 파일명 노출을 방지
     private String createObjectKey(Long memberId, String extension) {
-        return "receipts/%d/%s.%s".formatted(
+        return "fridge-photos/%d/%s.%s".formatted(
                 memberId,
                 UUID.randomUUID(),
                 extension
         );
     }
-
 }
