@@ -87,6 +87,24 @@ public class Subscription {
         return subscription;
     }
 
+    public static Subscription createTrial(
+            Long memberId,
+            Long fridgeId,
+            Long subscriptionPlanId,
+            LocalDateTime trialStartedAt,
+            LocalDateTime trialEndsAt
+    ) {
+        Subscription subscription = new Subscription();
+        subscription.memberId = memberId;
+        subscription.fridgeId = fridgeId;
+        subscription.subscriptionPlanId = subscriptionPlanId;
+        subscription.status = SubscriptionStatus.TRIALING;
+        subscription.trialStartedAt = trialStartedAt;
+        subscription.trialEndsAt = trialEndsAt;
+        subscription.nextBillingAt = trialEndsAt;
+        return subscription;
+    }
+
     public void renew(
             Long subscriptionPlanId,
             LocalDateTime periodStartAt,

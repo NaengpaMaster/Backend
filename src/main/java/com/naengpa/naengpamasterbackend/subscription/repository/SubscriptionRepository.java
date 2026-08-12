@@ -18,4 +18,6 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Long
             Long memberId,
             Collection<SubscriptionStatus> statuses
     );
+
+    boolean existsByMemberIdAndTrialStartedAtIsNotNull(Long memberId);
 }

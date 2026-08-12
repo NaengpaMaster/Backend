@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -27,5 +28,14 @@ public class SubscriptionController {
             @Parameter(hidden = true) Authentication authentication
     ) {
         return ResponseEntity.ok(ApiResponse.success(subscriptionService.getMySubscription(authentication.getName())));
+    }
+
+    @Operation(summary = "무료체험 시작", description = "활성 결제 수단이 있는 회원에게 최초 1회 7일 무료체험 구독을 시작합니다.")
+    @PostMapping("/trial")
+    public ResponseEntity<ApiResponse<SubscriptionStatusResponse>> startTrial(
+            @Parameter(hidden = true) Authentication authentication
+    ) {
+        SubscriptionStatusResponse response = subscriptionService.startTrial(authentication.getName());
+        return ResponseEntity.ok(ApiResponse.success("무료체험이 시작되었습니다.", response));
     }
 }

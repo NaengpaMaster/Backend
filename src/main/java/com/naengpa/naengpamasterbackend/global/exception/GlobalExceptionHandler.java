@@ -256,6 +256,12 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.fail(exception.getMessage()));
     }
 
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<ApiResponse<Void>> handleIllegalStateException(IllegalStateException exception) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiResponse.fail(exception.getMessage()));
+    }
+
     @ExceptionHandler(InvalidStatisticsPeriodException.class)
     public ResponseEntity<ApiResponse<Void>> handleInvalidStatisticsPeriodException(
             InvalidStatisticsPeriodException exception
