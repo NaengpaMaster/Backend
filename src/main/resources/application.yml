@@ -82,3 +82,8 @@ aws:
 
 oauth2:
   frontend-redirect-url: ${OAUTH2_FRONTEND_REDIRECT_URL:http://localhost:3000}
+
+toss-payments:
+  base-url: ${TOSS_PAYMENTS_BASE_URL:https://api.tosspayments.com}
+  secret-key: ${TOSS_PAYMENTS_SECRET_KEY:}
+  security-key: ${TOSS_PAYMENTS_SECURITY_KEY:}

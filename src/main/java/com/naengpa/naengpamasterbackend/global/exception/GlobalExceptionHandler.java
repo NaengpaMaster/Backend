@@ -1,6 +1,7 @@
 package com.naengpa.naengpamasterbackend.global.exception;
 
 import com.naengpa.naengpamasterbackend.global.response.ApiResponse;
+import com.naengpa.naengpamasterbackend.payment.exception.TossPaymentException;
 import com.naengpa.naengpamasterbackend.product.exception.ProductNotFoundException;
 import jakarta.persistence.NonUniqueResultException;
 import org.springframework.dao.IncorrectResultSizeDataAccessException;
@@ -267,6 +268,12 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleQuizAlreadySolvedException(QuizAlreadySolvedException exception)
     {
         return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiResponse.fail(exception.getMessage()));
+    }
+
+    @ExceptionHandler(TossPaymentException.class)
+    public ResponseEntity<ApiResponse<Void>> handleTossPaymentException(TossPaymentException exception) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.fail(exception.getMessage()));
     }
 
