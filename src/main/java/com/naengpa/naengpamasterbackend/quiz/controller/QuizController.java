@@ -4,7 +4,7 @@ import com.naengpa.naengpamasterbackend.global.response.ApiResponse;
 import com.naengpa.naengpamasterbackend.quiz.dto.request.QuizSubmitRequest;
 import com.naengpa.naengpamasterbackend.quiz.dto.response.QuizSubmitResponse;
 import com.naengpa.naengpamasterbackend.quiz.dto.response.QuizTodayResponse;
-import com.naengpa.naengpamasterbackend.quiz.QuizService;
+import com.naengpa.naengpamasterbackend.quiz.service.QuizService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;

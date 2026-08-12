@@ -1,4 +1,4 @@
-package com.naengpa.naengpamasterbackend.quiz;
+package com.naengpa.naengpamasterbackend.quiz.service;
 
 import com.naengpa.naengpamasterbackend.global.exception.QuizAlreadySolvedException;
 import com.naengpa.naengpamasterbackend.member.entity.Member;
@@ -22,7 +22,7 @@ import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
-public class QuizServiceImpl implements QuizService{
+public class QuizServiceImpl implements QuizService {
 
     private final QuizRepository quizRepository;
     private final QuizResultRepository quizResultRepository;

@@ -63,12 +63,12 @@ public class DailyQuizScheduler {
                 QuizGenerationClient.QuizGenerationResult result = quizGenerationClient.generateQuiz(ingredient);
 
                 if("low".equals(result.confidence())){
-                    log.warn("[품질 문제] 퀴즈 신뢰도 낮음 (시도 {}/{} - {}", i + 1, maxRetry);
+                    log.warn("[품질 문제] 퀴즈 신뢰도 낮음 (시도 {}/{} - {})", i + 1, maxRetry);
                     continue;
                 }
                 return result;
             } catch (Exception e){
-                log.warn("[통신 문제] 퀴즈 생성 API 호출 실패 (시도 {}/{} - {}", i + 1, maxRetry, e.getMessage());
+                log.warn("[통신 문제] 퀴즈 생성 API 호출 실패 (시도 {}/{} - {})", i + 1, maxRetry, e.getMessage());
             }
         }
         return null;

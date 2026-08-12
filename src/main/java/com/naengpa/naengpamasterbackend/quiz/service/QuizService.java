@@ -1,4 +1,4 @@
-package com.naengpa.naengpamasterbackend.quiz;
+package com.naengpa.naengpamasterbackend.quiz.service;
 
 import com.naengpa.naengpamasterbackend.quiz.dto.request.QuizSubmitRequest;
 import com.naengpa.naengpamasterbackend.quiz.dto.response.QuizSubmitResponse;
