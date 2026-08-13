@@ -1,11 +1,16 @@
 package com.naengpa.naengpamasterbackend.fridge;
 
 import com.naengpa.naengpamasterbackend.fridge.dto.request.FridgeItemUpdateRequest;
+import com.naengpa.naengpamasterbackend.fridge.entity.Fridge;
 import com.naengpa.naengpamasterbackend.fridge.entity.FridgeItem;
 import com.naengpa.naengpamasterbackend.fridge.repository.FridgeItemRepository;
+import com.naengpa.naengpamasterbackend.fridge.repository.FridgeItemHistoryRepository;
 import com.naengpa.naengpamasterbackend.fridge.service.FridgeItemService;
+import com.naengpa.naengpamasterbackend.fridge.service.FridgeService;
 import com.naengpa.naengpamasterbackend.member.entity.Member;
 import com.naengpa.naengpamasterbackend.member.repository.MemberRepository;
+import com.naengpa.naengpamasterbackend.product.entity.Product;
+import com.naengpa.naengpamasterbackend.product.repository.ProductRepository;
 import com.naengpa.naengpamasterbackend.product.service.ProductService;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.access.AccessDeniedException;
@@ -23,13 +28,21 @@ import static org.mockito.Mockito.when;
 class FridgeItemAuthorizationTests {
 
     private final FridgeItemRepository fridgeItemRepository = mock(FridgeItemRepository.class);
+    private final FridgeItemHistoryRepository fridgeItemHistoryRepository = mock(FridgeItemHistoryRepository.class);
     private final MemberRepository memberRepository = mock(MemberRepository.class);
     private final ProductService productService = mock(ProductService.class);
+    private final ProductRepository productRepository = mock(ProductRepository.class);
+    private final FridgeService fridgeService = mock(FridgeService.class);
     private final FridgeItemService fridgeItemService = new FridgeItemService(
             fridgeItemRepository,
+            fridgeItemHistoryRepository,
             memberRepository,
             productService,
-            mock(com.naengpa.naengpamasterbackend.product.repository.ProductRepository.class)
+            productRepository,
+            fridgeService,
+            mock(com.naengpa.naengpamasterbackend.fridge.repository.FridgeItemShareRequestRepository.class),
+            mock(com.naengpa.naengpamasterbackend.notification.service.NotificationService.class),
+            mock(com.naengpa.naengpamasterbackend.fridge.report.service.ConsumedProductService.class)
     );
 
     @Test
@@ -44,12 +57,13 @@ class FridgeItemAuthorizationTests {
         );
 
         when(memberRepository.findByEmail("owner@example.com")).thenReturn(Optional.of(member));
-        when(fridgeItemRepository.findByFridgeItemIdAndMemberIdAndIsDeletedFalse(99L, 1L))
+        when(fridgeService.getMyActiveFridge(member)).thenReturn(activeFridge(1L, 1L));
+        when(fridgeItemRepository.findByFridgeItemIdAndFridgeIdAndIsDeletedFalse(99L, 1L))
                 .thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> fridgeItemService.updateFridgeItem("owner@example.com", 99L, request))
                 .isInstanceOf(AccessDeniedException.class)
-                .hasMessage("본인 냉장고 재료만 접근할 수 있습니다.");
+                .hasMessage("접근할 수 없는 냉장고 재료입니다.");
 
         verify(productService, never()).validateExists(1L);
     }
@@ -60,12 +74,13 @@ class FridgeItemAuthorizationTests {
         ReflectionTestUtils.setField(member, "id", 1L);
 
         when(memberRepository.findByEmail("owner@example.com")).thenReturn(Optional.of(member));
-        when(fridgeItemRepository.findByFridgeItemIdAndMemberIdAndIsDeletedFalse(99L, 1L))
+        when(fridgeService.getMyActiveFridge(member)).thenReturn(activeFridge(1L, 1L));
+        when(fridgeItemRepository.findByFridgeItemIdAndFridgeIdAndIsDeletedFalse(99L, 1L))
                 .thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> fridgeItemService.deleteFridgeItem("owner@example.com", 99L))
                 .isInstanceOf(AccessDeniedException.class)
-                .hasMessage("본인 냉장고 재료만 접근할 수 있습니다.");
+                .hasMessage("접근할 수 없는 냉장고 재료입니다.");
     }
 
     @Test
@@ -73,6 +88,7 @@ class FridgeItemAuthorizationTests {
         Member member = Member.createUser("owner@example.com", "encoded", "owner", null);
         ReflectionTestUtils.setField(member, "id", 1L);
         FridgeItem fridgeItem = FridgeItem.create(
+                1L,
                 1L,
                 1L,
                 "1개",
@@ -88,11 +104,20 @@ class FridgeItemAuthorizationTests {
         );
 
         when(memberRepository.findByEmail("owner@example.com")).thenReturn(Optional.of(member));
-        when(fridgeItemRepository.findByFridgeItemIdAndMemberIdAndIsDeletedFalse(10L, 1L))
+        when(fridgeService.getMyActiveFridge(member)).thenReturn(activeFridge(1L, 1L));
+        when(fridgeItemRepository.findByFridgeItemIdAndFridgeIdAndIsDeletedFalse(10L, 1L))
                 .thenReturn(Optional.of(fridgeItem));
+        when(productRepository.findById(2L))
+                .thenReturn(Optional.of(Product.create(1L, "수정재료", 7)));
 
         fridgeItemService.updateFridgeItem("owner@example.com", 10L, request);
 
         verify(productService).validateExists(2L);
+    }
+
+    private Fridge activeFridge(Long fridgeId, Long ownerMemberId) {
+        Fridge fridge = Fridge.createDefault(ownerMemberId, "owner");
+        ReflectionTestUtils.setField(fridge, "fridgeId", fridgeId);
+        return fridge;
     }
 }

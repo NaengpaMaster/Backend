@@ -1,0 +1,164 @@
+package com.naengpa.naengpamasterbackend.subscription.entity;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
+import jakarta.persistence.Table;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
+import java.time.LocalDateTime;
+
+@Entity
+@Table(name = "subscriptions")
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+public class Subscription {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "subscription_id")
+    private Long subscriptionId;
+
+    @Column(name = "member_id", nullable = false)
+    private Long memberId;
+
+    @Column(name = "fridge_id", nullable = false)
+    private Long fridgeId;
+
+    @Column(name = "subscription_plan_id", nullable = false)
+    private Long subscriptionPlanId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private SubscriptionStatus status;
+
+    @Column(name = "trial_started_at")
+    private LocalDateTime trialStartedAt;
+
+    @Column(name = "trial_ends_at")
+    private LocalDateTime trialEndsAt;
+
+    @Column(name = "current_period_start_at")
+    private LocalDateTime currentPeriodStartAt;
+
+    @Column(name = "current_period_end_at")
+    private LocalDateTime currentPeriodEndAt;
+
+    @Column(name = "next_billing_at")
+    private LocalDateTime nextBillingAt;
+
+    @Column(name = "canceled_at")
+    private LocalDateTime canceledAt;
+
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
+    public boolean allowsFamilyShare() {
+        return status == SubscriptionStatus.TRIALING || status == SubscriptionStatus.ACTIVE;
+    }
+
+    public static Subscription createActive(
+            Long memberId,
+            Long fridgeId,
+            Long subscriptionPlanId,
+            LocalDateTime periodStartAt,
+            LocalDateTime periodEndAt,
+            LocalDateTime nextBillingAt
+    ) {
+        Subscription subscription = new Subscription();
+        subscription.memberId = memberId;
+        subscription.fridgeId = fridgeId;
+        subscription.subscriptionPlanId = subscriptionPlanId;
+        subscription.status = SubscriptionStatus.ACTIVE;
+        subscription.currentPeriodStartAt = periodStartAt;
+        subscription.currentPeriodEndAt = periodEndAt;
+        subscription.nextBillingAt = nextBillingAt;
+        return subscription;
+    }
+
+    public static Subscription createTrial(
+            Long memberId,
+            Long fridgeId,
+            Long subscriptionPlanId,
+            LocalDateTime trialStartedAt,
+            LocalDateTime trialEndsAt
+    ) {
+        Subscription subscription = new Subscription();
+        subscription.memberId = memberId;
+        subscription.fridgeId = fridgeId;
+        subscription.subscriptionPlanId = subscriptionPlanId;
+        subscription.status = SubscriptionStatus.TRIALING;
+        subscription.trialStartedAt = trialStartedAt;
+        subscription.trialEndsAt = trialEndsAt;
+        subscription.nextBillingAt = trialEndsAt;
+        return subscription;
+    }
+
+    public void renew(
+            Long subscriptionPlanId,
+            LocalDateTime periodStartAt,
+            LocalDateTime periodEndAt,
+            LocalDateTime nextBillingAt
+    ) {
+        this.subscriptionPlanId = subscriptionPlanId;
+        this.status = SubscriptionStatus.ACTIVE;
+        this.currentPeriodStartAt = periodStartAt;
+        this.currentPeriodEndAt = periodEndAt;
+        this.nextBillingAt = nextBillingAt;
+        this.canceledAt = null;
+    }
+
+    // 현재 이용 기간은 유지하고 다음 자동결제만 중단
+    public void reserveCancel() {
+        this.nextBillingAt = null;
+        this.canceledAt = LocalDateTime.now();
+    }
+
+    public boolean isCancelReserved() {
+        return canceledAt != null && nextBillingAt == null;
+    }
+
+    public LocalDateTime getAvailableUntil() {
+        if (status == SubscriptionStatus.TRIALING) {
+            return trialEndsAt;
+        }
+
+        return currentPeriodEndAt;
+    }
+
+    public void revokeCancel() {
+        if (!isCancelReserved()) {
+            throw new IllegalArgumentException("해지 예약 상태가 아닙니다.");
+        }
+
+        this.canceledAt = null;
+        this.nextBillingAt = getAvailableUntil();
+    }
+
+    // 자동결제 최종 실패 시 프리미엄 권한과 다음 결제 예약을 모두 종료
+    public void expire() {
+        this.status = SubscriptionStatus.EXPIRED;
+        this.nextBillingAt = null;
+    }
+
+    @PrePersist
+    void prePersist() {
+        createdAt = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    void preUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
+}

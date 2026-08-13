@@ -3,12 +3,25 @@ package com.naengpa.naengpamasterbackend.admin.service;
 import com.naengpa.naengpamasterbackend.admin.dto.request.AdminMemberRoleRequest;
 import com.naengpa.naengpamasterbackend.admin.dto.request.AdminMemberStatusRequest;
 import com.naengpa.naengpamasterbackend.admin.dto.response.AdminMemberResponse;
+import com.naengpa.naengpamasterbackend.admin.dto.response.AdminMemberDetailResponse;
+import com.naengpa.naengpamasterbackend.admin.dto.response.AdminMemberStatusHistoryResponse;
+import com.naengpa.naengpamasterbackend.admin.statistics.StatisticsPeriod;
 import com.naengpa.naengpamasterbackend.admin.repository.AdminMemberRepository;
+import com.naengpa.naengpamasterbackend.global.auth.entity.RefreshToken;
 import com.naengpa.naengpamasterbackend.global.auth.repository.RefreshTokenRepository;
+import com.naengpa.naengpamasterbackend.global.exception.InvalidMemberRoleChangeException;
+import com.naengpa.naengpamasterbackend.global.exception.InvalidMemberStatusChangeException;
+import com.naengpa.naengpamasterbackend.global.exception.LastAdminDemotionException;
 import com.naengpa.naengpamasterbackend.global.exception.MemberNotFoundException;
+import com.naengpa.naengpamasterbackend.global.exception.MemberRoleAlreadyAppliedException;
+import com.naengpa.naengpamasterbackend.global.exception.MemberStatusAlreadyAppliedException;
 import com.naengpa.naengpamasterbackend.member.entity.Member;
 import com.naengpa.naengpamasterbackend.member.entity.MemberRole;
 import com.naengpa.naengpamasterbackend.member.entity.MemberStatus;
+import com.naengpa.naengpamasterbackend.member.entity.MemberStatusHistory;
+import com.naengpa.naengpamasterbackend.member.repository.MemberStatusHistoryRepository;
+import com.naengpa.naengpamasterbackend.score.entity.Score;
+import com.naengpa.naengpamasterbackend.score.repository.ScoreRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -23,29 +36,110 @@ public class AdminMemberService {
 
     private final AdminMemberRepository adminMemberRepository;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final MemberStatusHistoryRepository memberStatusHistoryRepository;
+    private final ScoreRepository scoreRepository;
 
+    // 역할·상태·검색어 조건에 맞는 회원 목록을 페이지 단위로 조회합니다.
     @Transactional(readOnly = true)
     public Page<AdminMemberResponse> getMembers(MemberRole role, MemberStatus status, String search, Pageable pageable) {
         return adminMemberRepository.findMembers(role, status, search, pageable)
                 .map(AdminMemberResponse::from);
     }
 
-    @Transactional
-    public void updateMemberStatus(Long memberId, AdminMemberStatusRequest request) {
+    // 회원의 기본 정보와 냉파 점수를 조회합니다.
+    @Transactional(readOnly = true)
+    public AdminMemberDetailResponse getMemberDetail(Long memberId) {
         Member member = adminMemberRepository.findById(memberId)
                 .orElseThrow(MemberNotFoundException::new);
-        member.updateStatus(request.status());
-        if (request.status() == MemberStatus.INACTIVE) {
+        Integer naengpaScore = scoreRepository.findByMemberId(memberId)
+                .map(Score::getScore)
+                .orElse(null);
+
+        return AdminMemberDetailResponse.of(member, naengpaScore);
+    }
+
+    // 선택 기간의 회원 상태 변경 이력을 페이지 단위로 조회합니다.
+    @Transactional(readOnly = true)
+    public Page<AdminMemberStatusHistoryResponse> getMemberStatusHistories(
+            StatisticsPeriod period,
+            Pageable pageable
+    ) {
+        return memberStatusHistoryRepository.findAdminStatusHistories(
+                period.startAt(),
+                period.endExclusive(),
+                pageable
+        );
+    }
+
+    // 회원 상태를 변경하고 변경 이력 및 비활성 회원의 로그인 만료를 처리합니다.
+    @Transactional
+    public void updateMemberStatus(Long memberId, AdminMemberStatusRequest request, String adminEmail) {
+        Member member = adminMemberRepository.findById(memberId)
+                .orElseThrow(MemberNotFoundException::new);
+
+        MemberStatus previousStatus = member.getStatus();
+        Member admin = adminMemberRepository.findByEmail(adminEmail)
+                .orElseThrow(MemberNotFoundException::new);
+
+        MemberStatus changedStatus = request.status();
+
+        // 현재 상태와 동일한 상태로 변경하는 요청 방지
+        if (member.getStatus() == changedStatus) {
+            throw new MemberStatusAlreadyAppliedException();
+        }
+
+        // 관리자가 자기 자신을 비활성화하지 못하도록 방지
+        if (member.getId().equals(admin.getId())
+                && changedStatus == MemberStatus.INACTIVE) {
+            throw new InvalidMemberStatusChangeException();
+        }
+
+        member.updateStatus(changedStatus);
+        memberStatusHistoryRepository.save(
+                MemberStatusHistory.create(memberId, previousStatus, changedStatus)
+        );
+
+        // 회원이 비활성화되면 로그인 상태도 해제
+        if (changedStatus == MemberStatus.INACTIVE) {
             refreshTokenRepository.findAllByMemberAndExpiredAtAfter(member, LocalDateTime.now())
-                    .forEach(refreshToken -> refreshToken.expireNow());
+                    .forEach(RefreshToken::expireNow);
         }
     }
 
+    // 회원 역할을 변경하고 자기 권한 해제 및 마지막 관리자 해제를 방지합니다.
     @Transactional
-    public void updateMemberRole(Long memberId, AdminMemberRoleRequest request) {
-        adminMemberRepository.findById(memberId)
-                .orElseThrow(MemberNotFoundException::new)
-                .updateRole(request.role());
+    public void updateMemberRole(Long memberId, AdminMemberRoleRequest request, String adminEmail) {
+        Member member = adminMemberRepository.findById(memberId)
+                .orElseThrow(MemberNotFoundException::new);
+
+        Member admin = adminMemberRepository.findByEmail(adminEmail)
+                .orElseThrow(MemberNotFoundException::new);
+
+        MemberRole changedRole = request.role();
+
+        // 이미 적용된 권한으로 변경하는 요청 방지
+        if (member.getRole() == changedRole) {
+            throw new MemberRoleAlreadyAppliedException();
+        }
+
+        // 관리자가 자기 자신의 관리자 권한을 해제하지 못하도록 방지
+        if (member.getId().equals(admin.getId())
+                && changedRole == MemberRole.USER) {
+            throw new InvalidMemberRoleChangeException();
+        }
+
+        // 마지막 관리자의 권한 해제 방지
+        if (member.getRole() == MemberRole.ADMIN
+                && member.getStatus() == MemberStatus.ACTIVE
+                && changedRole == MemberRole.USER
+                && adminMemberRepository.countByRoleAndStatus(
+                        MemberRole.ADMIN,
+                        MemberStatus.ACTIVE
+                ) <= 1) {
+            throw new LastAdminDemotionException();
+        }
+
+        member.updateRole(changedRole);
     }
 
 }

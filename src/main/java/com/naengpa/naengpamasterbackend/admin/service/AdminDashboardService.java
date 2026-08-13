@@ -16,6 +16,7 @@ public class AdminDashboardService {
     private final AdminMemberRepository adminMemberRepository;
     private final AdminInquiryRepository adminInquiryRepository;
 
+    // 관리자·회원·미답변 문의 수로 구성된 기존 대시보드 요약을 조회합니다.
     @Transactional(readOnly = true)
     public AdminDashboardResponse getDashboard() {
         Long adminCount = adminMemberRepository.countByStatusAndRole(MemberStatus.ACTIVE, MemberRole.ADMIN);

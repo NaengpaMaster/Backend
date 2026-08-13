@@ -1,9 +1,11 @@
 package com.naengpa.naengpamasterbackend.shopping;
 
 import com.naengpa.naengpamasterbackend.fridge.dto.response.FridgeItemResponse;
+import com.naengpa.naengpamasterbackend.global.exception.DuplicateShoppingItemException;
 import com.naengpa.naengpamasterbackend.member.entity.HouseholdType;
 import com.naengpa.naengpamasterbackend.member.entity.Member;
 import com.naengpa.naengpamasterbackend.member.repository.MemberRepository;
+import com.naengpa.naengpamasterbackend.product.repository.ProductRepository;
 import com.naengpa.naengpamasterbackend.shopping.dto.request.ShoppingItemCheckRequest;
 import com.naengpa.naengpamasterbackend.shopping.dto.request.ShoppingItemCreateRequest;
 import com.naengpa.naengpamasterbackend.shopping.dto.request.ShoppingItemMoveToFridgeRequest;
@@ -22,6 +24,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
 
 @SpringBootTest
 @Transactional
@@ -241,7 +244,104 @@ class ShoppingItemServiceTests {
         );
 
         // then
-        assertThat(result.expiryDate()).isEqualTo(LocalDate.now().plusDays(180));
+        assertThat(result.expiryDate()).isEqualTo(LocalDate.now().plusDays(30));
         assertThat(result.memo()).isEqualTo(request.memo());
+    }
+
+    @Test
+    @DisplayName("같은 사용자, 같은 상품, 미삭제, 미구매 장보기 항목은 중복 등록할 수 없다")
+    void createShoppingItem_throwsExceptionWhenActiveUnpurchasedItemAlreadyExists() {
+        // given
+        String email = "test-user@example.com";
+        ShoppingItemCreateRequest request = new ShoppingItemCreateRequest(
+                1L,
+                "1개"
+        );
+
+        shoppingItemService.createShoppingItem(email, request);
+
+        // when & then
+        assertThatThrownBy(() -> shoppingItemService.createShoppingItem(email, request))
+                .isInstanceOf(DuplicateShoppingItemException.class)
+                .hasMessage("이미 장보기 목록에 등록된 재료입니다.");
+    }
+
+    @Test
+    @DisplayName("삭제된 같은 상품은 다시 장보기 항목으로 등록할 수 있다")
+    void createShoppingItem_allowsRecreateWhenSameProductWasDeleted() {
+        // given
+        String email = "test-user@example.com";
+        ShoppingItemCreateRequest request = new ShoppingItemCreateRequest(
+                1L,
+                "1개"
+        );
+
+        ShoppingItemResponse created = shoppingItemService.createShoppingItem(email, request);
+        shoppingItemService.deleteShoppingItem(email, created.shoppingItemId());
+
+        // when
+        ShoppingItemResponse result = shoppingItemService.createShoppingItem(email, request);
+
+        // then
+        assertThat(result.shoppingItemId()).isNotEqualTo(created.shoppingItemId());
+        assertThat(result.productId()).isEqualTo(1L);
+        assertThat(result.quantity()).isEqualTo("1개");
+    }
+
+    @Test
+    @DisplayName("구매 완료된 같은 상품은 다시 장보기 항목으로 등록할 수 있다")
+    void createShoppingItem_allowsRecreateWhenSameProductWasPurchased() {
+        // given
+        String email = "test-user@example.com";
+        ShoppingItemCreateRequest request = new ShoppingItemCreateRequest(
+                1L,
+                "1개"
+        );
+
+        ShoppingItemResponse created = shoppingItemService.createShoppingItem(email, request);
+        shoppingItemService.updateShoppingItemPurchased(
+                email,
+                created.shoppingItemId(),
+                new ShoppingItemCheckRequest(true)
+        );
+
+        // when
+        ShoppingItemResponse result = shoppingItemService.createShoppingItem(email, request);
+
+        // then
+        assertThat(result.shoppingItemId()).isNotEqualTo(created.shoppingItemId());
+        assertThat(result.productId()).isEqualTo(1L);
+        assertThat(result.isPurchased()).isFalse();
+    }
+
+    @Test
+    @DisplayName("다른 사용자의 같은 상품은 중복 장보기 항목으로 보지 않는다")
+    void createShoppingItem_allowsSameProductForDifferentMember() {
+        // given
+        String firstEmail = "test-user@example.com";
+        String secondEmail = "second-user@example.com";
+
+        if (!memberRepository.existsByEmail(secondEmail)) {
+            memberRepository.save(Member.createUser(
+                    secondEmail,
+                    "password",
+                    "두번째유저",
+                    HouseholdType.ONE_PERSON
+            ));
+        }
+
+        ShoppingItemCreateRequest request = new ShoppingItemCreateRequest(
+                1L,
+                "1개"
+        );
+
+        ShoppingItemResponse firstResult = shoppingItemService.createShoppingItem(firstEmail, request);
+
+        // when
+        ShoppingItemResponse secondResult = shoppingItemService.createShoppingItem(secondEmail, request);
+
+        // then
+        assertThat(secondResult.shoppingItemId()).isNotEqualTo(firstResult.shoppingItemId());
+        assertThat(secondResult.productId()).isEqualTo(1L);
     }
 }

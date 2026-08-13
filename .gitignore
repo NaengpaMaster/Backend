@@ -5,6 +5,9 @@ build/
 !**/src/main/**/build/
 !**/src/test/**/build/
 
+### macOS ###
+.DS_Store
+
 ### STS ###
 .apt_generated
 .classpath
@@ -38,3 +41,8 @@ out/
 
 ### Secret ###
 src/main/resources/application-secret.env
+
+### Personal docs ###
+docs/*
+!docs/inquiry-knowledge/
+!docs/inquiry-knowledge/**
