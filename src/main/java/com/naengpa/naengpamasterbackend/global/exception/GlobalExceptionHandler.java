@@ -215,6 +215,14 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.fail(exception.getMessage()));
     }
 
+    @ExceptionHandler(MonthlySettlementNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMonthlySettlementNotFoundException(
+            MonthlySettlementNotFoundException exception
+    ) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.fail(exception.getMessage()));
+    }
+
     @ExceptionHandler(InquiryChatSessionNotFoundException.class)
     public ResponseEntity<ApiResponse<Void>> handleInquiryChatSessionNotFoundException(
             InquiryChatSessionNotFoundException exception
