@@ -34,6 +34,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 public class SecurityConfig {
 
     private static final String[] PUBLIC_GET_ENDPOINTS = {
+            "/api/v1/health",
             "/actuator/health",
             "/error",
             "/v3/api-docs",
