@@ -2,11 +2,13 @@ package com.naengpa.naengpamasterbackend.payment.service;
 
 import com.naengpa.naengpamasterbackend.member.entity.Member;
 import com.naengpa.naengpamasterbackend.member.repository.MemberRepository;
+import com.naengpa.naengpamasterbackend.global.exception.SubscriptionNotFoundException;
 import com.naengpa.naengpamasterbackend.payment.dto.response.MyBillingKeyResponse;
 import com.naengpa.naengpamasterbackend.payment.dto.response.MyPaymentHistoryResponse;
 import com.naengpa.naengpamasterbackend.payment.repository.BillingKeyRepository;
 import com.naengpa.naengpamasterbackend.payment.repository.PaymentRepository;
 import com.naengpa.naengpamasterbackend.subscription.dto.response.SubscriptionStatusResponse;
+import com.naengpa.naengpamasterbackend.subscription.entity.Subscription;
 import com.naengpa.naengpamasterbackend.subscription.entity.SubscriptionStatus;
 import com.naengpa.naengpamasterbackend.subscription.repository.SubscriptionRepository;
 import com.naengpa.naengpamasterbackend.subscription.service.SubscriptionService;
@@ -56,17 +58,25 @@ public class MySubscriptionBillingService {
     @Transactional
     public SubscriptionStatusResponse cancelMySubscription(String email) {
         Member member = findMemberByEmail(email);
+        Subscription subscription = findCancelableSubscription(member.getId());
 
         // 즉시 해지가 아니라 다음 결제만 중단하므로 status는 유지
-        subscriptionRepository.findFirstByMemberIdAndStatusInOrderBySubscriptionIdDesc(
-                        member.getId(),
-                        CANCELABLE_STATUSES
-                )
-                .ifPresent(subscription -> {
-                    if (!subscription.isCancelReserved()) {
-                        subscription.reserveCancel();
-                    }
-                });
+        if (subscription.isCancelReserved()) {
+            throw new IllegalStateException("이미 해지 예약된 구독입니다.");
+        }
+
+        subscription.reserveCancel();
+
+        return subscriptionService.getMySubscription(email);
+    }
+
+    @Transactional
+    public SubscriptionStatusResponse revokeCancelMySubscription(String email) {
+        Member member = findMemberByEmail(email);
+        Subscription subscription = findCancelableSubscription(member.getId());
+
+        // 해지 예약 취소는 canceledAt을 비우고 nextBillingAt을 이용 가능 종료일로 복구
+        subscription.revokeCancel();
 
         return subscriptionService.getMySubscription(email);
     }
@@ -74,5 +84,12 @@ public class MySubscriptionBillingService {
     private Member findMemberByEmail(String email) {
         return memberRepository.findByEmail(email)
                 .orElseThrow(() -> new BadCredentialsException("회원을 찾을 수 없습니다."));
+    }
+
+    private Subscription findCancelableSubscription(Long memberId) {
+        return subscriptionRepository.findFirstByMemberIdAndStatusInOrderBySubscriptionIdDesc(
+                memberId,
+                CANCELABLE_STATUSES
+        ).orElseThrow(() -> new SubscriptionNotFoundException("구독 정보를 찾을 수 없습니다."));
     }
 }

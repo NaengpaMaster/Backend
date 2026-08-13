@@ -87,6 +87,24 @@ public class Subscription {
         return subscription;
     }
 
+    public static Subscription createTrial(
+            Long memberId,
+            Long fridgeId,
+            Long subscriptionPlanId,
+            LocalDateTime trialStartedAt,
+            LocalDateTime trialEndsAt
+    ) {
+        Subscription subscription = new Subscription();
+        subscription.memberId = memberId;
+        subscription.fridgeId = fridgeId;
+        subscription.subscriptionPlanId = subscriptionPlanId;
+        subscription.status = SubscriptionStatus.TRIALING;
+        subscription.trialStartedAt = trialStartedAt;
+        subscription.trialEndsAt = trialEndsAt;
+        subscription.nextBillingAt = trialEndsAt;
+        return subscription;
+    }
+
     public void renew(
             Long subscriptionPlanId,
             LocalDateTime periodStartAt,
@@ -109,6 +127,29 @@ public class Subscription {
 
     public boolean isCancelReserved() {
         return canceledAt != null && nextBillingAt == null;
+    }
+
+    public LocalDateTime getAvailableUntil() {
+        if (status == SubscriptionStatus.TRIALING) {
+            return trialEndsAt;
+        }
+
+        return currentPeriodEndAt;
+    }
+
+    public void revokeCancel() {
+        if (!isCancelReserved()) {
+            throw new IllegalArgumentException("해지 예약 상태가 아닙니다.");
+        }
+
+        this.canceledAt = null;
+        this.nextBillingAt = getAvailableUntil();
+    }
+
+    // 자동결제 최종 실패 시 프리미엄 권한과 다음 결제 예약을 모두 종료
+    public void expire() {
+        this.status = SubscriptionStatus.EXPIRED;
+        this.nextBillingAt = null;
     }
 
     @PrePersist

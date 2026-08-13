@@ -116,6 +116,10 @@ public class Payment {
         this.nextRetryAt = null;
     }
 
+    public void assignBillingKey(Long billingKeyId) {
+        this.billingKeyId = billingKeyId;
+    }
+
     // Toss 자동결제가 실패하면 실패 사유와 재시도 정보를 저장
     public void markFailed(String failedReason, int retryCount, LocalDateTime nextRetryAt) {
         this.status = retryCount >= 3 ? PaymentStatus.FAILED : PaymentStatus.RETRYING;

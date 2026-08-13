@@ -11,6 +11,7 @@ import com.naengpa.naengpamasterbackend.payment.dto.response.SubscriptionPayment
 import com.naengpa.naengpamasterbackend.payment.entity.BillingKey;
 import com.naengpa.naengpamasterbackend.payment.entity.Payment;
 import com.naengpa.naengpamasterbackend.payment.entity.PaymentPlanType;
+import com.naengpa.naengpamasterbackend.payment.entity.PaymentStatus;
 import com.naengpa.naengpamasterbackend.payment.exception.TossPaymentException;
 import com.naengpa.naengpamasterbackend.payment.repository.BillingKeyRepository;
 import com.naengpa.naengpamasterbackend.payment.repository.PaymentRepository;
@@ -48,21 +49,20 @@ public class SubscriptionPaymentService {
     public SubscriptionPaymentResponse approveSubscriptionPayment(String email, SubscriptionPaymentRequest request) {
         Member member = findMemberByEmail(email);
 
-        // 구독 취소자는 현재 결제 기간까지만 사용하고 다음 자동결제는 진행하지 않는다.
+        // 구독 취소자는 현재 결제 기간까지만 사용하고 다음 자동결제는 진행하지 않음
         validateNotCanceled(member.getId());
 
-        // #328에서 등록한 활성 결제 수단을 가져온다.
         BillingKey billingKey = findActiveBillingKey(member.getId());
 
-        // 결제 금액은 프론트 요청값이 아니라 DB에 저장된 구독 플랜 가격을 기준으로 한다.
+        // 결제 금액은 프론트 요청값이 아니라 DB에 저장된 구독 플랜 가격을 기준
         SubscriptionPlan plan = findPlan(request.planType());
 
-        // 이번 결제가 보장하는 구독 기간을 계산한다.
+        // 이번 결제가 보장하는 구독 기간을 계산
         LocalDate periodStart = LocalDate.now();
         LocalDate periodEnd = calculatePeriodEnd(periodStart, plan);
 
-        // Toss 호출 전에 READY 결제 이력을 먼저 저장한다.
-        // 이렇게 해야 Toss 호출 실패 시에도 실패 로그를 남길 수 있다.
+        // Toss 호출 전에 READY 결제 이력을 먼저 저장
+        // 이렇게 해야 Toss 호출 실패 시에도 실패 로그를 남김
         Payment payment = paymentRepository.save(Payment.ready(
                 member.getId(),
                 billingKey.getBillingKeyId(),
@@ -75,7 +75,7 @@ public class SubscriptionPaymentService {
         ));
 
         try {
-            // 저장된 billingKey로 Toss 자동결제 승인 API를 호출한다.
+            // 저장된 billingKey로 Toss 자동결제 승인 API를 호출
             TossBillingPaymentResponse tossResponse = tossBillingClient.approveBillingPayment(
                     billingKey.getTossBillingKey(),
                     billingKey.getTossCustomerKey(),
@@ -84,19 +84,74 @@ public class SubscriptionPaymentService {
                     payment.getAmount()
             );
 
-            // Toss 승인 성공 결과를 payments에 반영한다.
+            // Toss 승인 성공 결과를 payments에 반영
             payment.markSuccess(
                     tossResponse.getPaymentKey(),
                     parseApprovedAt(tossResponse.getApprovedAt())
             );
 
-            // 결제 성공 후 구독을 ACTIVE 상태로 생성하거나 갱신한다.
+            // 결제 성공 후 구독을 ACTIVE 상태로 생성하거나 갱신
             activateSubscription(member, plan, periodStart, periodEnd);
 
             return SubscriptionPaymentResponse.from(payment);
         } catch (TossPaymentException exception) {
-            // Toss 결제 실패도 payments에 남긴다. 3회 미만이면 RETRYING, 3회 이상이면 FAILED가 된다.
+            // Toss 결제 실패도 payments에 남김. 3회 미만이면 RETRYING, 3회 이상이면 FAILED
             payment.markFailed(exception.getMessage(), payment.getRetryCount() + 1, calculateNextRetryAt());
+            throw exception;
+        }
+    }
+
+    // 스케줄러에서 nextBillingAt이 도래한 구독 1건을 자동결제 처리
+    @Transactional
+    public void processAutoBilling(Subscription subscription) {
+        Member member = memberRepository.findById(subscription.getMemberId())
+                .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다."));
+        SubscriptionPlan plan = subscriptionPlanRepository.findById(subscription.getSubscriptionPlanId())
+                .orElseThrow(() -> new IllegalArgumentException("구독 플랜을 찾을 수 없습니다."));
+        PaymentPlanType planType = plan.getBillingPeriod() == BillingPeriod.YEAR
+                ? PaymentPlanType.YEARLY
+                : PaymentPlanType.MONTHLY;
+
+        LocalDate periodStart = subscription.getNextBillingAt().toLocalDate();
+        LocalDate periodEnd = calculatePeriodEnd(periodStart, plan);
+        int retryCount = calculateRetryCount(member.getId(), periodStart, periodEnd);
+
+        Payment payment = paymentRepository.save(Payment.ready(
+                member.getId(),
+                null,
+                createOrderId(),
+                createOrderName(planType),
+                plan.getPrice(),
+                planType,
+                periodStart,
+                periodEnd
+        ));
+
+        try {
+            BillingKey billingKey = findActiveBillingKey(member.getId());
+            payment.assignBillingKey(billingKey.getBillingKeyId());
+
+            TossBillingPaymentResponse tossResponse = tossBillingClient.approveBillingPayment(
+                    billingKey.getTossBillingKey(),
+                    billingKey.getTossCustomerKey(),
+                    payment.getOrderId(),
+                    payment.getOrderName(),
+                    payment.getAmount()
+            );
+
+            payment.markSuccess(
+                    tossResponse.getPaymentKey(),
+                    parseApprovedAt(tossResponse.getApprovedAt())
+            );
+            subscription.renew(
+                    plan.getSubscriptionPlanId(),
+                    periodStart.atStartOfDay(),
+                    periodEnd.atStartOfDay(),
+                    periodEnd.atStartOfDay()
+            );
+            subscriptionRepository.save(subscription);
+        } catch (RuntimeException exception) {
+            markAutoBillingFailed(payment, subscription, exception.getMessage(), retryCount);
             throw exception;
         }
     }
@@ -138,6 +193,30 @@ public class SubscriptionPaymentService {
         }
 
         return periodStart.plusMonths(plan.getBillingInterval());
+    }
+
+    private int calculateRetryCount(Long memberId, LocalDate periodStart, LocalDate periodEnd) {
+        long failedCount = paymentRepository.countByMemberIdAndBillingPeriodStartAndBillingPeriodEndAndStatusIn(
+                memberId,
+                periodStart,
+                periodEnd,
+                List.of(PaymentStatus.RETRYING, PaymentStatus.FAILED)
+        );
+        return Math.toIntExact(failedCount + 1);
+    }
+
+    private void markAutoBillingFailed(
+            Payment payment,
+            Subscription subscription,
+            String failedReason,
+            int retryCount
+    ) {
+        // 빌링키 없음/Toss 실패 모두 결제 실패 이력으로 남기고 3회째부터 구독을 만료
+        payment.markFailed(failedReason, retryCount, calculateNextRetryAt());
+        if (retryCount >= 3) {
+            subscription.expire();
+            subscriptionRepository.save(subscription);
+        }
     }
 
     // 결제 성공 후 회원의 기본 냉장고 기준으로 구독을 생성하거나 갱신

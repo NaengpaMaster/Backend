@@ -27,6 +27,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -154,6 +155,98 @@ class SubscriptionPaymentServiceTests {
                 .hasMessage("TossPayments 자동결제 승인에 실패했습니다.");
     }
 
+    @Test
+    @DisplayName("스케줄러 자동결제 성공 시 결제 성공 이력을 남기고 구독 기간을 갱신한다")
+    void processAutoBilling_succeedsAndRenewsSubscription() {
+        // given
+        Member member = createMember(1L, "auto-success@test.com");
+        BillingKey billingKey = createBillingKey(member.getId());
+        SubscriptionPlan plan = createPlan(10L, 2900, BillingPeriod.MONTH, 1);
+        Subscription subscription = createTrialSubscription(member.getId(), plan.getSubscriptionPlanId());
+        TossBillingPaymentResponse tossResponse = createTossPaymentResponse("auto-payment-key");
+
+        when(memberRepository.findById(member.getId())).thenReturn(Optional.of(member));
+        when(subscriptionPlanRepository.findById(plan.getSubscriptionPlanId())).thenReturn(Optional.of(plan));
+        when(paymentRepository.countByMemberIdAndBillingPeriodStartAndBillingPeriodEndAndStatusIn(
+                eq(member.getId()),
+                any(),
+                any(),
+                eq(List.of(PaymentStatus.RETRYING, PaymentStatus.FAILED))
+        )).thenReturn(0L);
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(billingKeyRepository.findFirstByMemberIdAndIsActiveTrueOrderByBillingKeyIdDesc(member.getId()))
+                .thenReturn(Optional.of(billingKey));
+        when(tossBillingClient.approveBillingPayment(
+                eq(billingKey.getTossBillingKey()),
+                eq(billingKey.getTossCustomerKey()),
+                any(String.class),
+                eq("냉파마스터 월간 구독"),
+                eq(2900)
+        )).thenReturn(tossResponse);
+
+        // when
+        subscriptionPaymentService.processAutoBilling(subscription);
+
+        // then
+        assertThat(subscription.getStatus()).isEqualTo(SubscriptionStatus.ACTIVE);
+        assertThat(subscription.getCurrentPeriodEndAt()).isNotNull();
+        assertThat(subscription.getNextBillingAt()).isEqualTo(subscription.getCurrentPeriodEndAt());
+    }
+
+    @Test
+    @DisplayName("스케줄러 자동결제 시 활성 빌링키가 없으면 실패 이력을 남긴다")
+    void processAutoBilling_marksPaymentFailedWhenBillingKeyNotFound() {
+        // given
+        Member member = createMember(1L, "auto-no-card@test.com");
+        SubscriptionPlan plan = createPlan(10L, 2900, BillingPeriod.MONTH, 1);
+        Subscription subscription = createTrialSubscription(member.getId(), plan.getSubscriptionPlanId());
+
+        when(memberRepository.findById(member.getId())).thenReturn(Optional.of(member));
+        when(subscriptionPlanRepository.findById(plan.getSubscriptionPlanId())).thenReturn(Optional.of(plan));
+        when(paymentRepository.countByMemberIdAndBillingPeriodStartAndBillingPeriodEndAndStatusIn(
+                eq(member.getId()),
+                any(),
+                any(),
+                eq(List.of(PaymentStatus.RETRYING, PaymentStatus.FAILED))
+        )).thenReturn(0L);
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(billingKeyRepository.findFirstByMemberIdAndIsActiveTrueOrderByBillingKeyIdDesc(member.getId()))
+                .thenReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> subscriptionPaymentService.processAutoBilling(subscription))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("등록된 결제 수단이 없습니다.");
+    }
+
+    @Test
+    @DisplayName("스케줄러 자동결제가 3회째 실패하면 구독을 EXPIRED 처리한다")
+    void processAutoBilling_expiresSubscriptionWhenThirdFailure() {
+        // given
+        Member member = createMember(1L, "auto-third-fail@test.com");
+        SubscriptionPlan plan = createPlan(10L, 2900, BillingPeriod.MONTH, 1);
+        Subscription subscription = createTrialSubscription(member.getId(), plan.getSubscriptionPlanId());
+
+        when(memberRepository.findById(member.getId())).thenReturn(Optional.of(member));
+        when(subscriptionPlanRepository.findById(plan.getSubscriptionPlanId())).thenReturn(Optional.of(plan));
+        when(paymentRepository.countByMemberIdAndBillingPeriodStartAndBillingPeriodEndAndStatusIn(
+                eq(member.getId()),
+                any(),
+                any(),
+                eq(List.of(PaymentStatus.RETRYING, PaymentStatus.FAILED))
+        )).thenReturn(2L);
+        when(paymentRepository.save(any(Payment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(billingKeyRepository.findFirstByMemberIdAndIsActiveTrueOrderByBillingKeyIdDesc(member.getId()))
+                .thenReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> subscriptionPaymentService.processAutoBilling(subscription))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("등록된 결제 수단이 없습니다.");
+        assertThat(subscription.getStatus()).isEqualTo(SubscriptionStatus.EXPIRED);
+        assertThat(subscription.getNextBillingAt()).isNull();
+    }
+
     private Member createMember(Long memberId, String email) {
         Member member = Member.createUser(
                 email,
@@ -190,6 +283,19 @@ class SubscriptionPaymentServiceTests {
         Fridge fridge = mock(Fridge.class);
         when(fridge.getFridgeId()).thenReturn(fridgeId);
         return fridge;
+    }
+
+    private Subscription createTrialSubscription(Long memberId, Long planId) {
+        LocalDateTime now = LocalDateTime.now();
+        Subscription subscription = Subscription.createTrial(
+                memberId,
+                100L,
+                planId,
+                now.minusDays(7),
+                now
+        );
+        ReflectionTestUtils.setField(subscription, "subscriptionId", 30L);
+        return subscription;
     }
 
     private TossBillingPaymentResponse createTossPaymentResponse(String paymentKey) {

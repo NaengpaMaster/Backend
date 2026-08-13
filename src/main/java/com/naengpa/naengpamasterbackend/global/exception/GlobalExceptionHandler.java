@@ -209,6 +209,12 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.fail(exception.getMessage()));
     }
 
+    @ExceptionHandler(SubscriptionNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleSubscriptionNotFoundException(SubscriptionNotFoundException exception) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.fail(exception.getMessage()));
+    }
+
     @ExceptionHandler(InquiryChatSessionNotFoundException.class)
     public ResponseEntity<ApiResponse<Void>> handleInquiryChatSessionNotFoundException(
             InquiryChatSessionNotFoundException exception
@@ -253,6 +259,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiResponse<Void>> handleIllegalArgumentException(IllegalArgumentException exception) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.fail(exception.getMessage()));
+    }
+
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<ApiResponse<Void>> handleIllegalStateException(IllegalStateException exception) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(ApiResponse.fail(exception.getMessage()));
     }
 
