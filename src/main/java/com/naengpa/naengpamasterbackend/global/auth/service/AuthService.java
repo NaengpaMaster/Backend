@@ -28,6 +28,9 @@ import com.naengpa.naengpamasterbackend.product.entity.Product;
 import com.naengpa.naengpamasterbackend.product.exception.ProductNotFoundException;
 import com.naengpa.naengpamasterbackend.product.repository.ProductRepository;
 import com.naengpa.naengpamasterbackend.score.entity.Score;
+import com.naengpa.naengpamasterbackend.score.entity.ScoreHistory;
+import com.naengpa.naengpamasterbackend.score.entity.ScoreReason;
+import com.naengpa.naengpamasterbackend.score.repository.ScoreHistoryRepository;
 import com.naengpa.naengpamasterbackend.score.repository.ScoreRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -68,6 +71,7 @@ public class AuthService {
     private final FridgeService fridgeService;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
+    private final ScoreHistoryRepository scoreHistoryRepository;
 
     @Transactional
     public MemberResponse signup(SignUpRequest request) {
@@ -93,6 +97,8 @@ public class AuthService {
         Member savedMember = memberRepository.save(member);
         fridgeService.createDefaultFridge(savedMember);
         scoreRepository.save(Score.createInitial(savedMember.getId()));
+        scoreHistoryRepository.save(ScoreHistory.createSignupBonus(savedMember.getId()));
+
         return MemberResponse.from(savedMember);
     }
 
