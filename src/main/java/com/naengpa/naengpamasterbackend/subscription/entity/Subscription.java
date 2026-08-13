@@ -146,6 +146,12 @@ public class Subscription {
         this.nextBillingAt = getAvailableUntil();
     }
 
+    // 자동결제 최종 실패 시 프리미엄 권한과 다음 결제 예약을 모두 종료
+    public void expire() {
+        this.status = SubscriptionStatus.EXPIRED;
+        this.nextBillingAt = null;
+    }
+
     @PrePersist
     void prePersist() {
         createdAt = LocalDateTime.now();
