@@ -149,6 +149,7 @@ public class SubscriptionPaymentService {
                     periodEnd.atStartOfDay(),
                     periodEnd.atStartOfDay()
             );
+            subscriptionRepository.save(subscription);
         } catch (RuntimeException exception) {
             markAutoBillingFailed(payment, subscription, exception.getMessage(), retryCount);
             throw exception;
@@ -214,6 +215,7 @@ public class SubscriptionPaymentService {
         payment.markFailed(failedReason, retryCount, calculateNextRetryAt());
         if (retryCount >= 3) {
             subscription.expire();
+            subscriptionRepository.save(subscription);
         }
     }
 
