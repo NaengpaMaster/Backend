@@ -22,6 +22,8 @@ import com.naengpa.naengpamasterbackend.member.entity.HouseholdType;
 import com.naengpa.naengpamasterbackend.member.entity.Member;
 import com.naengpa.naengpamasterbackend.member.repository.MemberRepository;
 import com.naengpa.naengpamasterbackend.score.entity.Score;
+import com.naengpa.naengpamasterbackend.score.entity.ScoreHistory;
+import com.naengpa.naengpamasterbackend.score.repository.ScoreHistoryRepository;
 import com.naengpa.naengpamasterbackend.score.repository.ScoreRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -57,6 +59,7 @@ public class OAuth2AccountService {
     private final EmailVerificationService emailVerificationService;
     private final FridgeService fridgeService;
     private final ScoreRepository scoreRepository;
+    private final ScoreHistoryRepository scoreHistoryRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
 
@@ -242,6 +245,7 @@ public class OAuth2AccountService {
         Member savedMember = memberRepository.save(member);
         fridgeService.createDefaultFridge(savedMember);
         scoreRepository.save(Score.createInitial(savedMember.getId()));
+        scoreHistoryRepository.save(ScoreHistory.createSignupBonus(savedMember.getId()));
         return savedMember;
     }
 
