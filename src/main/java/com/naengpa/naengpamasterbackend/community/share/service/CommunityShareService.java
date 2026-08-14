@@ -101,6 +101,22 @@ public class CommunityShareService {
         return PageResponse.of(toResponses(posts, member.getId()), postPage.getNumber(), PAGE_SIZE, postPage.getTotalElements());
     }
 
+    @Transactional(readOnly = true)
+    public PageResponse<CommunitySharePostResponse> findMyJoinedPosts(String email, int page) {
+        Member member = findMember(email);
+        Page<CommunitySharePost> postPage = communityShareParticipantRepository.findJoinedPostsByMemberId(
+                member.getId(),
+                CommunityShareParticipantStatus.JOINED,
+                PageRequest.of(Math.max(page, 0), PAGE_SIZE)
+        );
+        List<PostWithDistance> posts = postPage.getContent()
+                .stream()
+                .map(post -> new PostWithDistance(post, null))
+                .toList();
+
+        return PageResponse.of(toResponses(posts, member.getId()), postPage.getNumber(), PAGE_SIZE, postPage.getTotalElements());
+    }
+
     private List<PostWithDistance> slice(List<PostWithDistance> posts, int page) {
         int safePage = Math.max(page, 0);
         int fromIndex = safePage * PAGE_SIZE;
