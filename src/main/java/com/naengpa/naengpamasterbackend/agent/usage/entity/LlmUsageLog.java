@@ -18,7 +18,7 @@ public class LlmUsageLog {
     @Column(name = "llm_usage_log_id")
     private Long llmUsageLogId;
 
-    @Column(name = "member_id", nullable = false)
+    @Column(name = "member_id")
     private Long memberId;
 
     @Enumerated(EnumType.STRING)
