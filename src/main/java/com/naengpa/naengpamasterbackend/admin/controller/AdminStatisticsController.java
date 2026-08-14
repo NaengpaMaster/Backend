@@ -39,6 +39,8 @@ public class AdminStatisticsController {
         return ResponseEntity.ok(ApiResponse.success(adminStatisticsService.getRecipeStatistics(period)));
     }
 
+
+
     // 선택 기간 재료·냉파 상세 통계 조회
     @Operation(summary = "재료·냉파 통계 조회", description = "선택 기간의 재료 등록 및 만료 현황을 조회합니다.")
     @GetMapping("/materials")
