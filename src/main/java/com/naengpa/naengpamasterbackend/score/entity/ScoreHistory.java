@@ -57,4 +57,12 @@ public class ScoreHistory {
         return history;
     }
 
+    public static ScoreHistory createSignupBonus(Long memberId){
+        ScoreHistory history = new ScoreHistory();
+        history.memberId = memberId;
+        history.scoreReason = ScoreReason.SIGNUP_BONUS;
+        history.scoreDelta = Score.INITIAL_SCORE;
+        return history;
+    }
+
 }
