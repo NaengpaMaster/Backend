@@ -52,6 +52,16 @@ public class CommunityShareController {
         return ResponseEntity.ok(ApiResponse.success(communityShareService.findMyPosts(authentication.getName(), page)));
     }
 
+    @Operation(summary = "내가 참여한 나눔 목록 조회", description = "로그인한 회원이 참여 중인 식재료 나눔 글을 조회합니다.")
+    @GetMapping("/me/joined")
+    public ResponseEntity<ApiResponse<PageResponse<CommunitySharePostResponse>>> findMyJoinedPosts(
+            @Parameter(hidden = true) Authentication authentication,
+            @Parameter(description = "페이지 번호", example = "0")
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "0") int page
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(communityShareService.findMyJoinedPosts(authentication.getName(), page)));
+    }
+
     @Operation(summary = "나눔 글 등록", description = "큰 식재료를 주변 사용자와 나눠 갖기 위한 모집 글을 등록합니다.")
     @PostMapping
     public ResponseEntity<ApiResponse<CommunitySharePostResponse>> createPost(
