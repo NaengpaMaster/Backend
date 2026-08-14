@@ -5,7 +5,9 @@ import com.naengpa.naengpamasterbackend.agent.shopping.client.dto.AgentShoppingR
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Component
 public class AgentShoppingRecommendationClient {
 
@@ -23,11 +25,22 @@ public class AgentShoppingRecommendationClient {
     public AgentShoppingRecommendationResponse recommend(
             AgentShoppingRecommendationRequest request
     ) {
+        long startedAt = System.nanoTime();
+
         // Spring Boot 백엔드가 FastAPI Agent 서버의 추천 API를 호출하는 지점
-        return restClient.post()
-                .uri("/agent/v1/shopping/recommendations")
-                .body(request)
-                .retrieve()
-                .body(AgentShoppingRecommendationResponse.class);
+        try {
+            return restClient.post()
+                    .uri("/agent/v1/shopping/recommendations")
+                    .body(request)
+                    .retrieve()
+                    .body(AgentShoppingRecommendationResponse.class);
+        } finally {
+            log.info(
+                    "장보기 Agent 호출 완료 - elapsedMs={}, candidateCount={}, limit={}",
+                    (System.nanoTime() - startedAt) / 1_000_000,
+                    request.candidateProducts().size(),
+                    request.limit()
+            );
+        }
     }
 }

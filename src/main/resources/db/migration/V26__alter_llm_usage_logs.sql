@@ -1,0 +1,1 @@
+ALTER TABLE llm_usage_logs ALTER COLUMN member_id DROP NOT NULL;

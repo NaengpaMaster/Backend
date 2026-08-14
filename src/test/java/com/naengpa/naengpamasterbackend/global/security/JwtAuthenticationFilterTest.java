@@ -50,6 +50,13 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
+    void prometheusRequestSkipsJwtFilter() {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/actuator/prometheus");
+
+        assertThat(filter.shouldNotFilter(request)).isTrue();
+    }
+
+    @Test
     void publicEmailVerificationRequestSkipsJwtFilterEvenWithAuthorizationHeader() {
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/auth/email-verifications");
         request.addHeader("Authorization", "Bearer expired-token");
