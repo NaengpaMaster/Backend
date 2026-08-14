@@ -20,6 +20,7 @@ import com.naengpa.naengpamasterbackend.inquiry.knowledge.service.InquiryKnowled
 import com.naengpa.naengpamasterbackend.member.entity.Member;
 import com.naengpa.naengpamasterbackend.member.repository.MemberRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,6 +31,7 @@ import java.util.Collections;
 import java.util.List;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class InquiryChatService {
 
@@ -51,8 +53,14 @@ public class InquiryChatService {
         InquiryChatSession session = resolveSession(member.getId(), request.conversationSessionId(), question);
 
         List<InquiryChatHistoryMessage> history = recentHistory(session.getId());
+        long searchStartedAt = System.nanoTime();
         List<InquiryKnowledgeContextResponse> contexts =
                 knowledgeService.findRelevantContexts(question, CONTEXT_LIMIT);
+        log.info(
+                "문의 정책 검색 완료 - elapsedMs={}, contextCount={}",
+                (System.nanoTime() - searchStartedAt) / 1_000_000,
+                contexts.size()
+        );
 
         InquiryChatMessage userMessage = messageRepository.save(
                 InquiryChatMessage.create(session.getId(), InquiryChatMessageRole.USER, question)

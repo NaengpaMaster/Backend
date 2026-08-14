@@ -5,7 +5,9 @@ import com.naengpa.naengpamasterbackend.inquiry.chat.client.dto.InquiryChatAgent
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Component
 public class InquiryChatAgentClient {
 
@@ -23,10 +25,21 @@ public class InquiryChatAgentClient {
     }
 
     public InquiryChatAgentResponse answer(InquiryChatAgentRequest request) {
-        return restClient.post()
-                .uri("/agent/v1/inquiry-chat/answers")
-                .body(request)
-                .retrieve()
-                .body(InquiryChatAgentResponse.class);
+        long startedAt = System.nanoTime();
+
+        try {
+            return restClient.post()
+                    .uri("/agent/v1/inquiry-chat/answers")
+                    .body(request)
+                    .retrieve()
+                    .body(InquiryChatAgentResponse.class);
+        } finally {
+            log.info(
+                    "문의 Agent 호출 완료 - elapsedMs={}, contextCount={}, historyCount={}",
+                    (System.nanoTime() - startedAt) / 1_000_000,
+                    request.contexts().size(),
+                    request.history().size()
+            );
+        }
     }
 }
