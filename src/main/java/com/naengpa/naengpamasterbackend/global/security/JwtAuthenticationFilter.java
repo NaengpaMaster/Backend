@@ -42,6 +42,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             // 토큰이 있으면 인증을 채워 liked·수정/삭제 권한 등 사용자별 정보를 계산해야 하므로 필터를 건너뛰지 않는다.
             return "/api/v1/health".equals(path)
                     || "/actuator/health".equals(path)
+                    || "/actuator/prometheus".equals(path)
                     || path.startsWith("/v3/api-docs")
                     || path.startsWith("/swagger-ui")
                     || "/swagger-ui.html".equals(path)

@@ -97,3 +97,12 @@ toss-payments:
   base-url: ${TOSS_PAYMENTS_BASE_URL:https://api.tosspayments.com}
   secret-key: ${TOSS_PAYMENTS_SECRET_KEY:}
   security-key: ${TOSS_PAYMENTS_SECURITY_KEY:}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+  endpoint:
+    health:
+      show-details: never
