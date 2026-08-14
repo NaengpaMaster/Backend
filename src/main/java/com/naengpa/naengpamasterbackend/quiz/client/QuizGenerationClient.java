@@ -31,7 +31,15 @@ public class QuizGenerationClient {
             String statement,
             Boolean answer,
             String explanation,
-            String confidence
-    ) {}
+            String confidence,
+            UsageInfo usage
+    ) {
+        public record UsageInfo(
+                String model,
+                Integer promptTokens,
+                Integer completionTokens,
+                Integer totalTokens
+        ) {}
+    }
 }
 

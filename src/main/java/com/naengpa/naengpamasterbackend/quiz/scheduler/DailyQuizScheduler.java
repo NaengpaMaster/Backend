@@ -1,5 +1,6 @@
 package com.naengpa.naengpamasterbackend.quiz.scheduler;
 
+import com.naengpa.naengpamasterbackend.agent.usage.service.LlmUsageLogService;
 import com.naengpa.naengpamasterbackend.product.repository.ProductRepository;
 import com.naengpa.naengpamasterbackend.quiz.client.QuizGenerationClient;
 import com.naengpa.naengpamasterbackend.quiz.dto.ProductNameId;
@@ -22,9 +23,21 @@ public class DailyQuizScheduler {
     private final QuizGenerationClient quizGenerationClient;
     private final QuizRepository quizRepository;
     private final ProductRepository productRepository;
+    private final LlmUsageLogService llmUsageLogService;
 
     @Scheduled(cron = "0 0 0 * * *")
     public void generateDailyQuiz() {
+        log.info("퀴즈 생성 스케줄러 시작 - triggeredBy: AUTO");
+        generateQuizInternal(null);
+    }
+
+    public void generateDailyQuizManually(Long memberId) {
+        log.info("퀴즈 생성 스케줄러 시작 - triggeredBy: MANUAL, memberId: {}", memberId);
+        generateQuizInternal(memberId);
+    }
+
+    private void generateQuizInternal(Long memberId){
+
         LocalDate today = LocalDate.now();
 
         if (quizRepository.existsByQuizDate(today) ) {
@@ -32,14 +45,12 @@ public class DailyQuizScheduler {
             return;
         }
 
-        log.info("퀴즈 생성 스케줄러 시작");
-
         ProductNameId ingredient = pickRandomIngredient();
 
         QuizGenerationClient.QuizGenerationResult result = generateWithRetry(ingredient.name(), 3);
 
         if (result == null){
-            handleGenerationFailure(today);
+            handleGenerationFailure(today, memberId);
             return;
         }
 
@@ -53,6 +64,15 @@ public class DailyQuizScheduler {
         );
 
         quizRepository.save(quiz);
+
+        llmUsageLogService.saveQuizSuccessLog(
+                memberId,
+                result.usage().model(),
+                result.usage().promptTokens(),
+                result.usage().completionTokens(),
+                result.usage().totalTokens(),
+                null
+        );
 
         log.info("퀴즈 생성 완료 - ingredient: {}", ingredient.name());
     }
@@ -74,8 +94,10 @@ public class DailyQuizScheduler {
         return null;
     }
 
-    private void handleGenerationFailure(LocalDate today){
+    private void handleGenerationFailure(LocalDate today, Long memberId){
         log.error("퀴즈 생성 3회 모두 실패, 과거 퀴즈로 대체 - date: {}", today);
+
+        llmUsageLogService.saveQuizFailureLog(memberId, "unknwon", "퀴즈 생성 3회 재시도 실패");
 
         Quiz pastQuiz = quizRepository.findRandomPastQuiz()
                 .orElseThrow(() -> new IllegalStateException("대체할 과거 퀴즈도 존재하지 않습니다."));
