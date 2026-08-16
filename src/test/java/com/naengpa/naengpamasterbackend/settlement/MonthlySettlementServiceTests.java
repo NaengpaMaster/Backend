@@ -1,5 +1,7 @@
 package com.naengpa.naengpamasterbackend.settlement;
 
+import com.naengpa.naengpamasterbackend.agent.usage.entity.LlmCallStatus;
+import com.naengpa.naengpamasterbackend.agent.usage.repository.LlmUsageLogRepository;
 import com.naengpa.naengpamasterbackend.global.exception.MonthlySettlementNotFoundException;
 import com.naengpa.naengpamasterbackend.payment.entity.Payment;
 import com.naengpa.naengpamasterbackend.payment.entity.PaymentPlanType;
@@ -18,6 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
@@ -40,6 +43,7 @@ class MonthlySettlementServiceTests {
     private PaymentRepository paymentRepository;
     private MonthlySettlementRepository monthlySettlementRepository;
     private SettlementPaymentDetailRepository settlementPaymentDetailRepository;
+    private LlmUsageLogRepository llmUsageLogRepository;
     private MonthlySettlementService monthlySettlementService;
 
     @BeforeEach
@@ -47,12 +51,21 @@ class MonthlySettlementServiceTests {
         paymentRepository = mock(PaymentRepository.class);
         monthlySettlementRepository = mock(MonthlySettlementRepository.class);
         settlementPaymentDetailRepository = mock(SettlementPaymentDetailRepository.class);
+        llmUsageLogRepository = mock(LlmUsageLogRepository.class);
 
         monthlySettlementService = new MonthlySettlementService(
                 paymentRepository,
                 monthlySettlementRepository,
-                settlementPaymentDetailRepository
+                settlementPaymentDetailRepository,
+                llmUsageLogRepository
         );
+
+        // 별도 지정이 없는 테스트에서는 LLM 비용이 없는 달로 간주
+        when(llmUsageLogRepository.sumEstimatedCostByStatusAndCreatedAtBetween(
+                eq(LlmCallStatus.SUCCESS),
+                any(LocalDateTime.class),
+                any(LocalDateTime.class)
+        )).thenReturn(BigDecimal.ZERO);
     }
 
     @Test
@@ -288,6 +301,11 @@ class MonthlySettlementServiceTests {
                 eq(LocalDateTime.of(2026, 8, 1, 0, 0)),
                 eq(LocalDateTime.of(2026, 9, 1, 0, 0))
         )).thenReturn(List.of(monthlyPayment, yearlyPayment));
+        when(llmUsageLogRepository.sumEstimatedCostByStatusAndCreatedAtBetween(
+                eq(LlmCallStatus.SUCCESS),
+                eq(LocalDateTime.of(2026, 8, 1, 0, 0)),
+                eq(LocalDateTime.of(2026, 9, 1, 0, 0))
+        )).thenReturn(new BigDecimal("1.25"));
         when(monthlySettlementRepository.findBySettlementMonth("2026-08")).thenReturn(Optional.empty());
         when(monthlySettlementRepository.save(any(MonthlySettlement.class))).thenAnswer(invocation -> {
             MonthlySettlement settlement = invocation.getArgument(0);
@@ -302,8 +320,8 @@ class MonthlySettlementServiceTests {
         assertThat(settlement.getSettlementMonth()).isEqualTo("2026-08");
         assertThat(settlement.getGrossAmount()).isEqualTo(30_740);
         assertThat(settlement.getTossFeeAmount()).isEqualTo(922);
-        assertThat(settlement.getLlmCostAmount()).isZero();
-        assertThat(settlement.getNetAmount()).isEqualTo(29_818);
+        assertThat(settlement.getLlmCostAmount()).isEqualTo(1_750);
+        assertThat(settlement.getNetAmount()).isEqualTo(28_068);
         assertThat(settlement.getSubscriberCount()).isEqualTo(2);
         assertThat(settlement.getPaymentCount()).isEqualTo(2);
         assertThat(settlement.getStatus()).isEqualTo(SettlementStatus.PENDING);
@@ -347,6 +365,11 @@ class MonthlySettlementServiceTests {
                 any(LocalDateTime.class),
                 any(LocalDateTime.class)
         )).thenReturn(List.of(payment));
+        when(llmUsageLogRepository.sumEstimatedCostByStatusAndCreatedAtBetween(
+                eq(LlmCallStatus.SUCCESS),
+                any(LocalDateTime.class),
+                any(LocalDateTime.class)
+        )).thenReturn(new BigDecimal("0.10"));
         when(monthlySettlementRepository.findBySettlementMonth("2026-08"))
                 .thenReturn(Optional.of(existingSettlement));
         when(monthlySettlementRepository.save(existingSettlement)).thenReturn(existingSettlement);
@@ -358,7 +381,8 @@ class MonthlySettlementServiceTests {
         assertThat(settlement.getMonthlySettlementId()).isEqualTo(20L);
         assertThat(settlement.getGrossAmount()).isEqualTo(2_900);
         assertThat(settlement.getTossFeeAmount()).isEqualTo(87);
-        assertThat(settlement.getNetAmount()).isEqualTo(2_813);
+        assertThat(settlement.getLlmCostAmount()).isEqualTo(140);
+        assertThat(settlement.getNetAmount()).isEqualTo(2_673);
         assertThat(settlement.getSubscriberCount()).isEqualTo(1);
         assertThat(settlement.getPaymentCount()).isEqualTo(1);
 

@@ -1,5 +1,7 @@
 package com.naengpa.naengpamasterbackend.settlement.service;
 
+import com.naengpa.naengpamasterbackend.agent.usage.entity.LlmCallStatus;
+import com.naengpa.naengpamasterbackend.agent.usage.repository.LlmUsageLogRepository;
 import com.naengpa.naengpamasterbackend.global.exception.MonthlySettlementNotFoundException;
 import com.naengpa.naengpamasterbackend.payment.entity.Payment;
 import com.naengpa.naengpamasterbackend.payment.entity.PaymentStatus;
@@ -15,6 +17,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.List;
@@ -26,10 +30,12 @@ public class MonthlySettlementService {
 
     private static final int TOSS_FEE_PERCENT = 3;
     private static final int MVP_LLM_COST_AMOUNT = 0;
+    private static final BigDecimal USD_TO_KRW_EXCHANGE_RATE = BigDecimal.valueOf(1_400);
 
     private final PaymentRepository paymentRepository;
     private final MonthlySettlementRepository monthlySettlementRepository;
     private final SettlementPaymentDetailRepository settlementPaymentDetailRepository;
+    private final LlmUsageLogRepository llmUsageLogRepository;
 
     // 관리자 정산 목록 조회. 상태와 월 필터는 둘 다 선택값
     @Transactional(readOnly = true)
@@ -109,8 +115,8 @@ public class MonthlySettlementService {
         // Toss 수수료: 총매출의 3%
         int tossFeeAmount = calculateTossFee(grossAmount);
 
-        // LLM 비용은 MVP에서 0원. 추후 llm_usage_logs 합산으로 교체 가능
-        int llmCostAmount = MVP_LLM_COST_AMOUNT;
+        // LLM 사용량 로그의 월별 예상 비용(USD)을 원화로 환산해 정산 비용에 반영
+        int llmCostAmount = calculateMonthlyLlmCostAmount(startAt, endAt);
 
         // 순매출: 총매출 - Toss 수수료 - LLM 비용
         int netAmount = grossAmount - tossFeeAmount - llmCostAmount;
@@ -141,6 +147,8 @@ public class MonthlySettlementService {
                     // 재계산 시 기존 상세 결제 내역을 지우고 다시 생성
                     settlementPaymentDetailRepository
                             .deleteAllByMonthlySettlementId(existingSettlement.getMonthlySettlementId());
+                    // 같은 payment_id로 상세를 다시 저장하므로 delete가 먼저 DB에 반영되도록 flush
+                    settlementPaymentDetailRepository.flush();
 
                     return existingSettlement;
                 })
@@ -170,6 +178,17 @@ public class MonthlySettlementService {
     // Toss 수수료는 원 단위 정수로 계산
     private int calculateTossFee(int grossAmount) {
         return grossAmount * TOSS_FEE_PERCENT / 100;
+    }
+
+    // llm_usage_logs.estimatedCost는 OpenAI 기준 USD이므로 정산 테이블에는 원화 정수로 저장
+    private int calculateMonthlyLlmCostAmount(LocalDateTime startAt, LocalDateTime endAt) {
+        BigDecimal estimatedCostUsd = llmUsageLogRepository
+                .sumEstimatedCostByStatusAndCreatedAtBetween(LlmCallStatus.SUCCESS, startAt, endAt);
+
+        return estimatedCostUsd
+                .multiply(USD_TO_KRW_EXCHANGE_RATE)
+                .setScale(0, RoundingMode.CEILING)
+                .intValue();
     }
 
     // Optional 필터 조합을 명확하게 분기해 Repository 메서드를 단순하게 유지
