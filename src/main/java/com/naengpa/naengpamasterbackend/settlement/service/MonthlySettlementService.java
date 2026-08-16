@@ -15,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -44,8 +45,7 @@ public class MonthlySettlementService {
     // 관리자 정산 상세 조회. 정산 요약과 해당 정산에 포함된 결제 내역을 함께 반환
     @Transactional(readOnly = true)
     public MonthlySettlementDetailResponse findMonthlySettlementDetail(Long settlementId) {
-        MonthlySettlement settlement = monthlySettlementRepository.findById(settlementId)
-                .orElseThrow(MonthlySettlementNotFoundException::new);
+        MonthlySettlement settlement = findSettlement(settlementId);
 
         List<SettlementPaymentDetail> details = settlementPaymentDetailRepository
                 .findByMonthlySettlementIdOrderBySettlementPaymentDetailIdAsc(settlementId);
@@ -53,12 +53,42 @@ public class MonthlySettlementService {
         return MonthlySettlementDetailResponse.from(settlement, details);
     }
 
+    // PENDING 정산을 CONFIRMED 상태로 확정
+    @Transactional
+    public MonthlySettlementResponse confirmMonthlySettlement(Long settlementId) {
+        MonthlySettlement settlement = findSettlement(settlementId);
+
+        settlement.confirm();
+
+        return MonthlySettlementResponse.from(settlement);
+    }
+
+    // CONFIRMED 정산을 PAID 상태로 지급 완료 처리
+    @Transactional
+    public MonthlySettlementResponse markMonthlySettlementPaid(Long settlementId) {
+        MonthlySettlement settlement = findSettlement(settlementId);
+
+        settlement.markPaid();
+
+        return MonthlySettlementResponse.from(settlement);
+    }
+
+    // PENDING 또는 CONFIRMED 정산을 CANCELED 상태로 취소
+    @Transactional
+    public MonthlySettlementResponse cancelMonthlySettlement(Long settlementId) {
+        MonthlySettlement settlement = findSettlement(settlementId);
+
+        settlement.cancel();
+
+        return MonthlySettlementResponse.from(settlement);
+    }
+
     // 관리자 요청 기준으로 특정 월의 구독 매출 정산을 생성하거나 PENDING 상태에서 재계산
     @Transactional
     public MonthlySettlement createMonthlySettlement(YearMonth settlementMonth) {
         // 정산 월의 시작 시각과 다음 달 시작 시각을 계산
-        var startAt = settlementMonth.atDay(1).atStartOfDay();
-        var endAt = settlementMonth.plusMonths(1).atDay(1).atStartOfDay();
+        LocalDateTime startAt = settlementMonth.atDay(1).atStartOfDay();
+        LocalDateTime endAt = settlementMonth.plusMonths(1).atDay(1).atStartOfDay();
 
         // 정산 대상은 승인일 기준 해당 월에 포함된 SUCCESS 결제만 사용
         List<Payment> payments = paymentRepository
@@ -181,5 +211,11 @@ public class MonthlySettlementService {
                 llmCostAmount,
                 netAmount
         );
+    }
+
+    // 정산 ID로 월별 정산을 조회하고, 없으면 404 예외로 연결
+    private MonthlySettlement findSettlement(Long settlementId) {
+        return monthlySettlementRepository.findById(settlementId)
+                .orElseThrow(MonthlySettlementNotFoundException::new);
     }
 }

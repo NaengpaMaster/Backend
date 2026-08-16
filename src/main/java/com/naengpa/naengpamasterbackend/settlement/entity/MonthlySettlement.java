@@ -114,6 +114,43 @@ public class MonthlySettlement {
         this.paymentCount = paymentCount;
     }
 
+    // PENDING 정산을 확정 상태로 변경
+    public void confirm() {
+        if (status != SettlementStatus.PENDING) {
+            throw new IllegalStateException("PENDING 정산만 확정할 수 있습니다.");
+        }
+
+        status = SettlementStatus.CONFIRMED;
+        confirmedAt = LocalDateTime.now();
+    }
+
+    // CONFIRMED 정산을 지급 완료 상태로 변경
+    public void markPaid() {
+        if (status != SettlementStatus.CONFIRMED) {
+            throw new IllegalStateException("CONFIRMED 정산만 지급 완료 처리할 수 있습니다.");
+        }
+
+        status = SettlementStatus.PAID;
+        paidAt = LocalDateTime.now();
+    }
+
+    // PENDING 또는 CONFIRMED 정산을 취소 상태로 변경
+    public void cancel() {
+        if (status == SettlementStatus.PAID) {
+            throw new IllegalStateException("이미 지급 완료된 정산은 취소할 수 없습니다.");
+        }
+
+        if (status == SettlementStatus.CANCELED) {
+            throw new IllegalStateException("이미 취소된 정산입니다.");
+        }
+
+        if (status != SettlementStatus.PENDING && status != SettlementStatus.CONFIRMED) {
+            throw new IllegalStateException("취소할 수 없는 정산 상태입니다.");
+        }
+
+        status = SettlementStatus.CANCELED;
+    }
+
     @PrePersist
     void prePersist() {
         createdAt = LocalDateTime.now();

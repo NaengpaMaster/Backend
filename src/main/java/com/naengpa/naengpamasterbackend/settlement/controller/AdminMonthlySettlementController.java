@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.PatchMapping;
 
 import java.time.YearMonth;
 import java.util.List;
@@ -51,6 +52,75 @@ public class AdminMonthlySettlementController {
 
         return ResponseEntity.ok(ApiResponse.success(
                 "월별 정산 목록 조회에 성공했습니다.",
+                response
+        ));
+    }
+
+    @Operation(
+            summary = "월별 정산 확정",
+            description = "PENDING 상태의 월별 정산을 CONFIRMED 상태로 변경합니다."
+    )
+    @io.swagger.v3.oas.annotations.responses.ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "월별 정산 확정 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "관리자 권한 없음"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "월별 정산 없음"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "허용되지 않는 상태 변경")
+    })
+    @PatchMapping("/{settlementId}/confirm")
+    public ResponseEntity<ApiResponse<MonthlySettlementResponse>> confirmMonthlySettlement(
+            @Parameter(description = "월별 정산 ID", example = "1")
+            @PathVariable Long settlementId
+    ) {
+        MonthlySettlementResponse response = monthlySettlementService.confirmMonthlySettlement(settlementId);
+
+        return ResponseEntity.ok(ApiResponse.success(
+                "월별 정산이 확정되었습니다.",
+                response
+        ));
+    }
+
+    @Operation(
+            summary = "월별 정산 지급 완료 처리",
+            description = "CONFIRMED 상태의 월별 정산을 PAID 상태로 변경합니다."
+    )
+    @io.swagger.v3.oas.annotations.responses.ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "월별 정산 지급 완료 처리 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "관리자 권한 없음"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "월별 정산 없음"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "허용되지 않는 상태 변경")
+    })
+    @PatchMapping("/{settlementId}/paid")
+    public ResponseEntity<ApiResponse<MonthlySettlementResponse>> markMonthlySettlementPaid(
+            @Parameter(description = "월별 정산 ID", example = "1")
+            @PathVariable Long settlementId
+    ) {
+        MonthlySettlementResponse response = monthlySettlementService.markMonthlySettlementPaid(settlementId);
+
+        return ResponseEntity.ok(ApiResponse.success(
+                "월별 정산이 지급 완료 처리되었습니다.",
+                response
+        ));
+    }
+
+    @Operation(
+            summary = "월별 정산 취소",
+            description = "PENDING 또는 CONFIRMED 상태의 월별 정산을 CANCELED 상태로 변경합니다."
+    )
+    @io.swagger.v3.oas.annotations.responses.ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "월별 정산 취소 성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "관리자 권한 없음"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "월별 정산 없음"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "허용되지 않는 상태 변경")
+    })
+    @PatchMapping("/{settlementId}/cancel")
+    public ResponseEntity<ApiResponse<MonthlySettlementResponse>> cancelMonthlySettlement(
+            @Parameter(description = "월별 정산 ID", example = "1")
+            @PathVariable Long settlementId
+    ) {
+        MonthlySettlementResponse response = monthlySettlementService.cancelMonthlySettlement(settlementId);
+
+        return ResponseEntity.ok(ApiResponse.success(
+                "월별 정산이 취소되었습니다.",
                 response
         ));
     }

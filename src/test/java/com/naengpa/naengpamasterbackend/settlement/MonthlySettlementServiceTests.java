@@ -5,6 +5,7 @@ import com.naengpa.naengpamasterbackend.payment.entity.Payment;
 import com.naengpa.naengpamasterbackend.payment.entity.PaymentPlanType;
 import com.naengpa.naengpamasterbackend.payment.entity.PaymentStatus;
 import com.naengpa.naengpamasterbackend.payment.repository.PaymentRepository;
+import com.naengpa.naengpamasterbackend.settlement.dto.response.MonthlySettlementResponse;
 import com.naengpa.naengpamasterbackend.settlement.entity.MonthlySettlement;
 import com.naengpa.naengpamasterbackend.settlement.entity.SettlementPaymentDetail;
 import com.naengpa.naengpamasterbackend.settlement.entity.SettlementStatus;
@@ -157,6 +158,124 @@ class MonthlySettlementServiceTests {
     }
 
     @Test
+    @DisplayName("PENDING 정산은 CONFIRMED 상태로 확정할 수 있다")
+    void confirmMonthlySettlement_changesPendingToConfirmed() {
+        // given
+        MonthlySettlement settlement = pendingSettlement(1L);
+        when(monthlySettlementRepository.findById(1L)).thenReturn(Optional.of(settlement));
+
+        // when
+        MonthlySettlementResponse response = monthlySettlementService.confirmMonthlySettlement(1L);
+
+        // then
+        assertThat(response.status()).isEqualTo(SettlementStatus.CONFIRMED);
+        assertThat(response.confirmedAt()).isNotNull();
+        assertThat(settlement.getStatus()).isEqualTo(SettlementStatus.CONFIRMED);
+    }
+
+    @Test
+    @DisplayName("CONFIRMED 정산은 PAID 상태로 지급 완료 처리할 수 있다")
+    void markMonthlySettlementPaid_changesConfirmedToPaid() {
+        // given
+        MonthlySettlement settlement = pendingSettlement(1L);
+        settlement.confirm();
+        when(monthlySettlementRepository.findById(1L)).thenReturn(Optional.of(settlement));
+
+        // when
+        MonthlySettlementResponse response = monthlySettlementService.markMonthlySettlementPaid(1L);
+
+        // then
+        assertThat(response.status()).isEqualTo(SettlementStatus.PAID);
+        assertThat(response.paidAt()).isNotNull();
+        assertThat(settlement.getStatus()).isEqualTo(SettlementStatus.PAID);
+    }
+
+    @Test
+    @DisplayName("PENDING 정산은 CANCELED 상태로 취소할 수 있다")
+    void cancelMonthlySettlement_changesPendingToCanceled() {
+        // given
+        MonthlySettlement settlement = pendingSettlement(1L);
+        when(monthlySettlementRepository.findById(1L)).thenReturn(Optional.of(settlement));
+
+        // when
+        MonthlySettlementResponse response = monthlySettlementService.cancelMonthlySettlement(1L);
+
+        // then
+        assertThat(response.status()).isEqualTo(SettlementStatus.CANCELED);
+        assertThat(settlement.getStatus()).isEqualTo(SettlementStatus.CANCELED);
+    }
+
+    @Test
+    @DisplayName("CONFIRMED 정산은 CANCELED 상태로 취소할 수 있다")
+    void cancelMonthlySettlement_changesConfirmedToCanceled() {
+        // given
+        MonthlySettlement settlement = pendingSettlement(1L);
+        settlement.confirm();
+        when(monthlySettlementRepository.findById(1L)).thenReturn(Optional.of(settlement));
+
+        // when
+        MonthlySettlementResponse response = monthlySettlementService.cancelMonthlySettlement(1L);
+
+        // then
+        assertThat(response.status()).isEqualTo(SettlementStatus.CANCELED);
+        assertThat(settlement.getStatus()).isEqualTo(SettlementStatus.CANCELED);
+    }
+
+    @Test
+    @DisplayName("PENDING 정산은 바로 PAID 처리할 수 없다")
+    void markMonthlySettlementPaid_throwsWhenSettlementIsPending() {
+        // given
+        MonthlySettlement settlement = pendingSettlement(1L);
+        when(monthlySettlementRepository.findById(1L)).thenReturn(Optional.of(settlement));
+
+        // when & then
+        assertThatThrownBy(() -> monthlySettlementService.markMonthlySettlementPaid(1L))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("CONFIRMED 정산만 지급 완료 처리할 수 있습니다.");
+    }
+
+    @Test
+    @DisplayName("PAID 정산은 취소할 수 없다")
+    void cancelMonthlySettlement_throwsWhenSettlementIsPaid() {
+        // given
+        MonthlySettlement settlement = pendingSettlement(1L);
+        settlement.confirm();
+        settlement.markPaid();
+        when(monthlySettlementRepository.findById(1L)).thenReturn(Optional.of(settlement));
+
+        // when & then
+        assertThatThrownBy(() -> monthlySettlementService.cancelMonthlySettlement(1L))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("이미 지급 완료된 정산은 취소할 수 없습니다.");
+    }
+
+    @Test
+    @DisplayName("CANCELED 정산은 다시 확정할 수 없다")
+    void confirmMonthlySettlement_throwsWhenSettlementIsCanceled() {
+        // given
+        MonthlySettlement settlement = pendingSettlement(1L);
+        settlement.cancel();
+        when(monthlySettlementRepository.findById(1L)).thenReturn(Optional.of(settlement));
+
+        // when & then
+        assertThatThrownBy(() -> monthlySettlementService.confirmMonthlySettlement(1L))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("PENDING 정산만 확정할 수 있습니다.");
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 정산은 상태 변경할 수 없다")
+    void confirmMonthlySettlement_throwsWhenSettlementNotFound() {
+        // given
+        when(monthlySettlementRepository.findById(999L)).thenReturn(Optional.empty());
+
+        // when & then
+        assertThatThrownBy(() -> monthlySettlementService.confirmMonthlySettlement(999L))
+                .isInstanceOf(MonthlySettlementNotFoundException.class)
+                .hasMessage("월별 정산을 찾을 수 없습니다.");
+    }
+
+    @Test
     @DisplayName("월별 정산 생성 시 해당 월 성공 결제만 집계하고 상세 결제 내역을 저장한다")
     void createMonthlySettlement_createsPendingSettlementFromSuccessPayments() {
         // given
@@ -301,6 +420,21 @@ class MonthlySettlementServiceTests {
         payment.markSuccess("payment-key-" + paymentId, LocalDateTime.of(2026, 8, 13, 10, 0));
         ReflectionTestUtils.setField(payment, "paymentId", paymentId);
         return payment;
+    }
+
+    private MonthlySettlement pendingSettlement(Long settlementId) {
+        MonthlySettlement settlement = MonthlySettlement.createPending(
+                "2026-08",
+                2_900,
+                0,
+                87,
+                0,
+                2_813,
+                1,
+                1
+        );
+        ReflectionTestUtils.setField(settlement, "monthlySettlementId", settlementId);
+        return settlement;
     }
 
     @SuppressWarnings("unchecked")
