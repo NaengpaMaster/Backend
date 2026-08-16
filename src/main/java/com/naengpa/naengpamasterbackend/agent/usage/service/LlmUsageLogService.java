@@ -222,4 +222,35 @@ public class LlmUsageLogService {
         return memberRepository.findByEmail(email)
                 .orElseThrow(() -> new BadCredentialsException("회원을 찾을 수 없습니다."));
     }
+
+    @Transactional
+    public void saveQuizSuccessLog(
+            Long memberId,
+            String modelName,
+            Integer promptTokens,
+            Integer completionTokens,
+            Integer totalTokens,
+            BigDecimal estimatedCost
+    ) {
+        llmUsageLogRepository.save(LlmUsageLog.success(
+                memberId,
+                LlmFeatureType.QUIZ_GENERATION,
+                modelName,
+                promptTokens,
+                completionTokens,
+                totalTokens,
+                resolveEstimatedCost(modelName, promptTokens, completionTokens, estimatedCost)
+        ));
+    }
+
+    @Transactional
+    public void saveQuizFailureLog(Long memberId, String modelName, String failureMessage) {
+        llmUsageLogRepository.save(LlmUsageLog.failed(
+                memberId,
+                LlmFeatureType.QUIZ_GENERATION,
+                modelName,
+                truncateFailureMessage(failureMessage)
+        ));
+    }
+
 }

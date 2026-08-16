@@ -23,6 +23,11 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Long
 
     boolean existsByMemberIdAndTrialStartedAtIsNotNull(Long memberId);
 
+    boolean existsByMemberIdAndStatusInAndCanceledAtIsNull(
+            Long memberId,
+            Collection<SubscriptionStatus> statuses
+    );
+
     List<Subscription> findAllByStatusInAndNextBillingAtLessThanEqualAndCanceledAtIsNull(
             Collection<SubscriptionStatus> statuses,
             LocalDateTime now

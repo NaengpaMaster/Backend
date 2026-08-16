@@ -16,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -76,5 +77,14 @@ public class MemberAuthController {
             @Valid @RequestBody ProfileUpdateRequest request
     ) {
         return ResponseEntity.ok(ApiResponse.success("프로필이 저장되었습니다.", authService.updateProfile(authentication.getName(), request)));
+    }
+
+    @Operation(summary = "회원탈퇴", description = "로그인한 회원을 탈퇴 처리합니다. 구독 중인 회원은 구독 취소 후 탈퇴할 수 있습니다.")
+    @DeleteMapping("/me")
+    public ResponseEntity<ApiResponse<Void>> withdraw(
+            @Parameter(hidden = true) Authentication authentication
+    ) {
+        authService.withdraw(authentication.getName());
+        return ResponseEntity.ok(ApiResponse.success("회원탈퇴가 완료되었습니다.", null));
     }
 }

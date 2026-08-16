@@ -18,6 +18,7 @@ import com.naengpa.naengpamasterbackend.global.security.JwtTokenProvider;
 import com.naengpa.naengpamasterbackend.fridge.service.FridgeService;
 import com.naengpa.naengpamasterbackend.member.entity.FoodCategory;
 import com.naengpa.naengpamasterbackend.member.entity.Member;
+import com.naengpa.naengpamasterbackend.member.entity.MemberStatus;
 import com.naengpa.naengpamasterbackend.member.entity.MemberExcludedProduct;
 import com.naengpa.naengpamasterbackend.member.entity.MemberFavoriteFood;
 import com.naengpa.naengpamasterbackend.member.repository.FoodCategoryRepository;
@@ -28,7 +29,12 @@ import com.naengpa.naengpamasterbackend.product.entity.Product;
 import com.naengpa.naengpamasterbackend.product.exception.ProductNotFoundException;
 import com.naengpa.naengpamasterbackend.product.repository.ProductRepository;
 import com.naengpa.naengpamasterbackend.score.entity.Score;
+import com.naengpa.naengpamasterbackend.score.entity.ScoreHistory;
+import com.naengpa.naengpamasterbackend.score.entity.ScoreReason;
+import com.naengpa.naengpamasterbackend.score.repository.ScoreHistoryRepository;
 import com.naengpa.naengpamasterbackend.score.repository.ScoreRepository;
+import com.naengpa.naengpamasterbackend.subscription.dto.response.SubscriptionStatusResponse;
+import com.naengpa.naengpamasterbackend.subscription.service.SubscriptionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.DisabledException;
@@ -64,10 +70,12 @@ public class AuthService {
     private final ProductRepository productRepository;
     private final ScoreRepository scoreRepository;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final SubscriptionService subscriptionService;
     private final EmailVerificationService emailVerificationService;
     private final FridgeService fridgeService;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
+    private final ScoreHistoryRepository scoreHistoryRepository;
 
     @Transactional
     public MemberResponse signup(SignUpRequest request) {
@@ -93,6 +101,8 @@ public class AuthService {
         Member savedMember = memberRepository.save(member);
         fridgeService.createDefaultFridge(savedMember);
         scoreRepository.save(Score.createInitial(savedMember.getId()));
+        scoreHistoryRepository.save(ScoreHistory.createSignupBonus(savedMember.getId()));
+
         return MemberResponse.from(savedMember);
     }
 
@@ -164,6 +174,20 @@ public class AuthService {
         replaceExcludedProducts(member, request.avoidProductIds());
 
         return toMemberResponse(member);
+    }
+
+    @Transactional
+    public void withdraw(String email) {
+        Member member = memberRepository.findByEmail(email)
+                .orElseThrow(() -> new BadCredentialsException("회원을 찾을 수 없습니다."));
+
+        SubscriptionStatusResponse subscriptionStatus = subscriptionService.getMySubscription(email);
+        if (subscriptionStatus.premium() && !subscriptionStatus.cancelReserved()) {
+            throw new IllegalStateException("현재 구독 중이라 회원탈퇴가 불가합니다. 구독 취소 후 다시 시도해주세요.");
+        }
+
+        member.updateStatus(MemberStatus.INACTIVE);
+        expireActiveRefreshTokens(member);
     }
 
     private TokenResponse issueTokens(Member member) {
