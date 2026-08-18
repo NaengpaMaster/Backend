@@ -84,20 +84,32 @@ public class DailyQuizScheduler {
 
                 if("low".equals(result.confidence())){
                     log.warn("[품질 문제] 퀴즈 신뢰도 낮음 (시도 {}/{})", i + 1, maxRetry);
+                    waitBeforeRetry(i);
                     continue;
                 }
                 return result;
             } catch (Exception e){
                 log.warn("[통신 문제] 퀴즈 생성 API 호출 실패 (시도 {}/{} - {})", i + 1, maxRetry, e.getMessage());
+                waitBeforeRetry(i);
             }
         }
         return null;
     }
 
+    private void waitBeforeRetry(int attemptIndex){
+        long waitMillis = 5000L * (attemptIndex + 1);
+        log.info("재시도 전 {}ms 대기", waitMillis);
+        try{
+            Thread.sleep(waitMillis);
+        }catch (InterruptedException e){
+            Thread.currentThread().interrupt();
+        }
+    }
+
     private void handleGenerationFailure(LocalDate today, Long memberId){
         log.error("퀴즈 생성 3회 모두 실패, 과거 퀴즈로 대체 - date: {}", today);
 
-        llmUsageLogService.saveQuizFailureLog(memberId, "unknwon", "퀴즈 생성 3회 재시도 실패");
+        llmUsageLogService.saveQuizFailureLog(memberId, "agent-api", "퀴즈 생성 3회 재시도 실패");
 
         Quiz pastQuiz = quizRepository.findRandomPastQuiz()
                 .orElseThrow(() -> new IllegalStateException("대체할 과거 퀴즈도 존재하지 않습니다."));

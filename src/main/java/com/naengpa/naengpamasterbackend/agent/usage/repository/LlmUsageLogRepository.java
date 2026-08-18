@@ -9,6 +9,8 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 public interface LlmUsageLogRepository extends JpaRepository<LlmUsageLog, Long> {
@@ -34,5 +36,18 @@ public interface LlmUsageLogRepository extends JpaRepository<LlmUsageLog, Long> 
             @Param("featureType") LlmFeatureType featureType,
             @Param("successStatus") LlmCallStatus successStatus,
             @Param("failedStatus") LlmCallStatus failedStatus
+    );
+
+    @Query("""
+            SELECT COALESCE(SUM(l.estimatedCost), 0)
+            FROM LlmUsageLog l
+            WHERE l.status = :status
+              AND l.createdAt >= :startAt
+              AND l.createdAt < :endAt
+            """)
+    BigDecimal sumEstimatedCostByStatusAndCreatedAtBetween(
+            @Param("status") LlmCallStatus status,
+            @Param("startAt") LocalDateTime startAt,
+            @Param("endAt") LocalDateTime endAt
     );
 }
