@@ -80,6 +80,11 @@ public class QuizServiceImpl implements QuizService {
         Quiz quiz = quizRepository.findById(request.quizId())
                 .orElseThrow(()-> new IllegalArgumentException("퀴즈를 찾을 수 없습니다."));
 
+        // 날짜 검증
+        if (!quiz.getQuizDate().equals(LocalDate.now())){
+            throw new QuizAlreadySolvedException("퀴즈가 갱신되었어요. 새로고침 후 다시 풀어주세요.");
+        }
+
         //중복 제출 방지
         if (quizResultRepository.existsByMemberIdAndQuizId(member.getId(), quiz.getQuizId())){
             throw new QuizAlreadySolvedException("이미 오늘 퀴즈를 풀었어요.");
