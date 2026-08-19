@@ -22,7 +22,7 @@ public class QuizGenerationClient {
 
     public QuizGenerationResult generateQuiz(String ingredient) {
         return restClient.get()
-                .uri("/quiz/generate?ingredient={ingredient}", ingredient)
+                .uri("/agent/v1/quiz/generate?ingredient={ingredient}", ingredient)
                 .retrieve()
                 .body(QuizGenerationResult.class);
     }
