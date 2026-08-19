@@ -25,7 +25,7 @@ public class DailyQuizScheduler {
     private final ProductRepository productRepository;
     private final LlmUsageLogService llmUsageLogService;
 
-    @Scheduled(cron = "0 0 11 * * *")
+    @Scheduled(cron = "0 0 0 * * *")
     public void generateDailyQuiz() {
         log.info("퀴즈 생성 스케줄러 시작 - triggeredBy: AUTO");
         generateQuizInternal(null);
